@@ -1,0 +1,18 @@
+{
+  "name": "legend-of-the-blue-waters",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A pirate-Caribbean JRPG of sea legends, built with PixiJS. No build step.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "serve": "npx --yes serve -l 8080 .",
+    "test": "node tools/balance.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "sweep": "node tools/scene-sweep.mjs",
+    "loop": "node tools/legend-loop.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

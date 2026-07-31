@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Legend of the Blue Waters</title>
+<meta name="description" content="A pirate-Caribbean JRPG of sea legends, built with PixiJS." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2306131f'/%3E%3Crect x='7' y='2' width='2' height='9' fill='%236b452b'/%3E%3Cpath d='M9 3h4l-4 4z' fill='%23ffd45e'/%3E%3Crect x='3' y='11' width='10' height='3' fill='%238f6039'/%3E%3Crect x='2' y='14' width='12' height='1' fill='%233fb8b0'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --deep: #06131f;
+    --ink:  #0a1d2e;
+    --foam: #6fd3c7;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--deep);
+    color: #cfe9ea;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Subtle vignette so the letterboxing does not read as "broken". */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%);
+    z-index: 3;
+  }
+  #stage-host {
+    position: relative;
+    line-height: 0;
+    z-index: 1;
+  }
+  #stage-host canvas {
+    display: block;
+    /* Crisp integer-scaled pixel art. */
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    box-shadow: 0 0 0 2px #0a2233, 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+  #boot {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: var(--deep);
+    z-index: 10;
+    transition: opacity 400ms ease;
+    text-align: center;
+    padding: 24px;
+  }
+  #boot.hidden { opacity: 0; pointer-events: none; }
+  #boot h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 4px;
+    font-weight: 600;
+    color: var(--foam);
+    text-transform: uppercase;
+  }
+  #boot p { margin: 0; font-size: 12px; opacity: 0.7; max-width: 44ch; line-height: 1.6; }
+  #boot .bar {
+    width: 220px; height: 6px; background: #0e2b3d; border: 1px solid #16455e; overflow: hidden;
+  }
+  #boot .bar > i {
+    display: block; height: 100%; width: 0%; background: var(--foam);
+    transition: width 200ms ease;
+  }
+  #boot .err { color: #ff9d8a; font-size: 12px; max-width: 60ch; text-align: left; white-space: pre-wrap; }
+  #boot code { color: #ffd98a; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "pixi.js": "./vendor/pixi.min.mjs"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="stage-host"></div>
+
+  <div id="boot">
+    <h1>Legend of the Blue Waters</h1>
+    <div class="bar"><i id="boot-bar"></i></div>
+    <p id="boot-msg">Charting the Sunder Reach&hellip;</p>
+  </div>
+
+  <script type="module">
+    const bootEl = document.getElementById('boot');
+    const barEl = document.getElementById('boot-bar');
+    const msgEl = document.getElementById('boot-msg');
+
+    function fail(err) {
+      bootEl.classList.remove('hidden');
+      barEl.style.width = '100%';
+      barEl.style.background = '#ff9d8a';
+      msgEl.className = 'err';
+      msgEl.textContent =
+        'The voyage could not launch.\n\n' + (err && err.stack ? err.stack : String(err)) +
+        '\n\nIf you opened this file directly from disk, serve the folder instead:\n' +
+        '    python3 -m http.server 8080\n' +
+        'then visit http://localhost:8080/';
+      console.error(err);
+    }
+
+    window.addEventListener('error', (e) => fail(e.error || e.message));
+    window.addEventListener('unhandledrejection', (e) => fail(e.reason));
+
+    try {
+      const { boot } = await import('./src/main.js');
+      await boot({
+        host: document.getElementById('stage-host'),
+        onProgress(pct, label) {
+          barEl.style.width = Math.round(pct * 100) + '%';
+          if (label) msgEl.textContent = label;
+        },
+      });
+      bootEl.classList.add('hidden');
+      setTimeout(() => bootEl.remove(), 500);
+    } catch (err) {
+      fail(err);
+    }
+  </script>
+</body>
+</html>
