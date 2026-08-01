@@ -18,6 +18,11 @@ export class Scene extends Container {
     this.overlay = false;
     /** Set by the manager while this scene is not the top of the stack. */
     this.paused = false;
+    /**
+     * Which on-screen controls this scene wants. See `core/touch.js` for the
+     * list. The manager applies it whenever this scene becomes the top.
+     */
+    this.controlScheme = 'none';
   }
 
   /** Build the scene. May be async (e.g. to await a fade). */
@@ -30,8 +35,21 @@ export class Scene extends Container {
   onResume(_result) {}
   /** @param {number} dtMS milliseconds since the previous frame */
   update(_dtMS) {}
-  /** Virtual-resolution size never changes, but scenes may want the hook. */
+  /**
+   * The stage width changes with the device aspect ratio (and on rotation),
+   * so scenes lay themselves out again here rather than assuming a size.
+   */
   resize(_w, _h) {}
+
+  /**
+   * Swap the on-screen controls mid-scene — the field does this when a
+   * conversation starts, so the whole screen becomes "tap to advance".
+   */
+  setControlScheme(name) {
+    if (this.controlScheme === name) return;
+    this.controlScheme = name;
+    if (this.game.scenes?.current === this) this.game.touch?.setScheme(name);
+  }
 }
 
 export class SceneManager {
@@ -104,6 +122,15 @@ export class SceneManager {
       s.visible = i >= firstVisible;
       s.paused = i !== this.stack.length - 1;
     }
+    // The topmost scene owns the on-screen controls.
+    this.game.touch?.setScheme(this.current?.controlScheme ?? 'none');
+  }
+
+  /** Re-lay-out every live scene for a new stage size. */
+  resize(w, h) {
+    this.fade.clear();
+    this.fade.rect(0, 0, w, h).fill(this._fadeColor ?? 0x000000);
+    for (const scene of this.stack) scene.resize(w, h);
   }
 
   /** Push a scene on top of the current one. */

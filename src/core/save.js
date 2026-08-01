@@ -84,6 +84,7 @@ const DEFAULT_OPTIONS = {
   sfxVolume: 0.75,
   muted: false,
   textSpeed: 2, // 0 slow .. 3 instant
+  quality: 'auto', // auto | high | medium | low
 };
 
 export function loadOptions() {

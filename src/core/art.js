@@ -88,62 +88,84 @@ function noise(x, y, seed = 0) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+/** 2048 is the texture size every WebGL implementation is required to support. */
+const ATLAS_W = 2048;
+const ATLAS_MAX_H = 2048;
+
 class ShelfAtlas {
-  constructor(width = 640) {
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = width;
-    this.canvas.height = 64;
-    this.ctx = this.canvas.getContext('2d', { willReadFrequently: false });
-    this.ctx.imageSmoothingEnabled = false;
-    this.x = 0;
-    this.y = 0;
-    this.rowH = 0;
-    /** @type {Map<string, {x:number,y:number,w:number,h:number}>} */
+  constructor(width = ATLAS_W, maxHeight = ATLAS_MAX_H) {
+    this.width = width;
+    this.maxHeight = maxHeight;
+    /** Shelf state per page; art at 3x is close enough to the cap to need it. */
+    this.pages = [ShelfAtlas._page()];
+    /** @type {Map<string, {page:number,x:number,y:number,w:number,h:number}>} */
     this.regions = new Map();
-    this.pending = [];
+  }
+
+  static _page() {
+    return { x: 0, y: 0, rowH: 0, pending: [], canvas: null };
   }
 
   /** Reserve a w*h slot named `name`; `draw(ctx, x, y)` paints into it. */
   add(name, w, h, draw) {
-    if (this.x + w > this.canvas.width) {
-      this.x = 0;
-      this.y += this.rowH + 1;
-      this.rowH = 0;
+    if (w > this.width || h > this.maxHeight) {
+      throw new Error(`art: sprite "${name}" (${w}x${h}) does not fit an atlas page`);
     }
-    const slot = { x: this.x, y: this.y, w, h };
+    let index = this.pages.length - 1;
+    let page = this.pages[index];
+
+    if (page.x + w > this.width) {
+      page.x = 0;
+      page.y += page.rowH + 1;
+      page.rowH = 0;
+    }
+    // Out of vertical room: start a fresh page rather than overflowing silently.
+    if (page.y + h + 1 > this.maxHeight) {
+      this.pages.push(ShelfAtlas._page());
+      index = this.pages.length - 1;
+      page = this.pages[index];
+    }
+
+    const slot = { page: index, x: page.x, y: page.y, w, h };
     this.regions.set(name, slot);
-    this.pending.push({ slot, draw });
-    this.x += w + 1;
-    this.rowH = Math.max(this.rowH, h);
+    page.pending.push({ slot, draw });
+    page.x += w + 1;
+    page.rowH = Math.max(page.rowH, h);
     return slot;
   }
 
   bake() {
-    const needed = this.y + this.rowH + 1;
-    // Grow the backing canvas once, then paint everything.
-    this.canvas.height = Math.max(64, needed);
-    this.ctx.imageSmoothingEnabled = false;
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    for (const { slot, draw } of this.pending) {
-      this.ctx.save();
-      draw(this.ctx, slot.x, slot.y);
-      this.ctx.restore();
-    }
-    this.pending.length = 0;
+    const sources = [];
+    for (let i = 0; i < this.pages.length; i++) {
+      const page = this.pages[i];
+      const canvas = document.createElement('canvas');
+      canvas.width = this.width;
+      canvas.height = Math.max(64, Math.min(this.maxHeight, page.y + page.rowH + 1));
+      const ctx = canvas.getContext('2d', { willReadFrequently: false });
+      ctx.imageSmoothingEnabled = false;
+      for (const { slot, draw } of page.pending) {
+        ctx.save();
+        draw(ctx, slot.x, slot.y);
+        ctx.restore();
+      }
+      page.pending.length = 0;
+      page.canvas = canvas;
 
-    const base = Texture.from(this.canvas);
-    base.source.scaleMode = 'nearest';
-    base.source.label = 'world-atlas';
+      const base = Texture.from(canvas);
+      base.source.scaleMode = 'nearest';
+      base.source.label = `world-atlas-${i}`;
+      sources.push(base);
+    }
 
     const frames = new Map();
     for (const [name, r] of this.regions) {
       frames.set(name, new Texture({
-        source: base.source,
+        source: sources[r.page].source,
         frame: new Rectangle(r.x, r.y, r.w, r.h),
         label: name,
       }));
     }
-    return { base, frames };
+    return { base: sources[0], pages: sources, frames, canvases: this.pages.map((p) => p.canvas) };
   }
 }
 
@@ -978,7 +1000,7 @@ export class Art {
 /** Build every texture the game uses. Returns an `Art` handle. */
 export function buildArt() {
   TextureSource.defaultOptions.scaleMode = 'nearest';
-  const atlas = new ShelfAtlas(768);
+  const atlas = new ShelfAtlas();
 
   for (const [name, draw] of Object.entries(TILE_ART)) {
     atlas.add(`tile:${name}`, TILE, TILE, (ctx, x, y) => draw(pen(ctx, x, y)));
@@ -1016,8 +1038,12 @@ export function buildArt() {
       (ctx, x, y) => drawBattler(pen(ctx, x, y, size, size), key, PAL, { noise, shade }));
   }
 
-  const { base, frames } = atlas.bake();
-  return new Art(frames, base);
+  const { base, pages, frames, canvases } = atlas.bake();
+  const art = new Art(frames, base);
+  art.pages = pages;
+  // Kept so tools/atlas-dump.mjs can write the sheet out for inspection.
+  art.canvases = canvases;
+  return art;
 }
 
 export { noise, shade, pen };
