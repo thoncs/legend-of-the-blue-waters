@@ -552,11 +552,12 @@ export function statLine(labelText, valueText, width, opts = {}) {
 export function header(title, width) {
   const c = new Container();
   const g = new Graphics();
-  g.rect(0, 0, width, 13).fill({ color: 0x0b1a2a, alpha: 0.95 });
-  g.rect(0, 13, width, 1).fill(UI.frameDim);
+  const h = LINE_H + U * 5;
+  g.rect(0, 0, width, h).fill({ color: 0x0b1a2a, alpha: 0.95 });
+  g.rect(0, h, width, U).fill(UI.frameDim);
   c.addChild(g);
   const t = new PixelText({ text: title, color: UI.accent });
-  t.x = 6; t.y = 3;
+  t.x = U * 6; t.y = U * 2;
   c.addChild(t);
   c.titleText = t;
   return c;

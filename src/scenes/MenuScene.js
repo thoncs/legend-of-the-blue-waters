@@ -4,7 +4,7 @@
  */
 import { Container, Graphics } from 'pixi.js';
 import { Scene } from '../core/scene.js';
-import { PixelText, measure } from '../core/font.js';
+import { PixelText, measure, LINE_H } from '../core/font.js';
 import { Panel, MenuList, Bar, UI, header } from '../core/ui.js';
 import { input, CONTROL_HELP } from '../core/input.js';
 import { audio } from '../core/audio.js';
@@ -30,45 +30,53 @@ export class MenuScene extends Scene {
     this.addChild(this.head);
 
     this.tabBar = new Container();
-    this.tabBar.y = 16;
+    this.tabBar.y = 190;
     this.addChild(this.tabBar);
 
     this.goldText = new PixelText({ text: '', color: UI.accent });
-    this.goldText.y = 3;
+    this.goldText.y = 41;
     this.addChild(this.goldText);
 
-    this.leftPanel = new Panel(126, height - 46);
-    this.leftPanel.x = 4;
-    this.leftPanel.y = 28;
+    const rowH = this.game.touchUnit;
+    const listW = 420;
+    const top = 116;
+    const bottom = 56;
+    this.leftPanel = new Panel(listW, height - top - bottom);
+    this.leftPanel.x = 18;
+    this.leftPanel.y = top;
     this.addChild(this.leftPanel);
 
-    this.rightPanel = new Panel(width - 138, height - 46);
-    this.rightPanel.x = 134;
-    this.rightPanel.y = 28;
+    this.rightPanel = new Panel(width - listW - 54, height - top - bottom);
+    this.rightPanel.x = listW + 36;
+    this.rightPanel.y = top;
     this.addChild(this.rightPanel);
 
     this.detail = new Container();
-    this.detail.x = 141;
-    this.detail.y = 34;
+    this.detail.x = listW + 57;
+    this.detail.y = top + 21;
     this.addChild(this.detail);
 
     this.list = new MenuList({
       items: [],
-      width: 118,
-      rows: 13,
-      rowHeight: 13,
+      width: listW - 42,
+      rows: Math.max(3, Math.floor((height - top - bottom - 36) / rowH)),
+      rowHeight: rowH,
+      touchHeight: rowH,
       onSelect: (item) => this.onSelect(item),
       onCancel: () => this.onCancel(),
       onMove: (item) => this.renderDetail(item),
     });
-    this.list.x = 10;
-    this.list.y = 34;
+    this.list.x = 42;
+    this.list.y = top + 21;
     this.addChild(this.list);
 
     this.footer = new PixelText({ text: '', color: UI.dim });
-    this.footer.x = 6;
-    this.footer.y = height - 12;
+    this.footer.x = 18;
+    this.footer.y = height - 40;
     this.addChild(this.footer);
+
+    // Added last so the tab strip draws over the panels beneath it.
+    this.addChild(this.tabBar);
 
     this.tab = Math.max(0, TABS.indexOf(this.capitalize(params.tab ?? 'party')));
     if (this.tab < 0) this.tab = 0;
@@ -87,15 +95,29 @@ export class MenuScene extends Scene {
 
   buildTabs() {
     this.tabBar.removeChildren();
-    let x = 6;
+    let x = 18;
     this.tabLabels = [];
     for (let i = 0; i < TABS.length; i++) {
       const label = new PixelText({ text: TABS[i], color: UI.dim });
       label.x = x;
       label.y = 0;
+      // Tabs are tappable, with a hit box padded out to a thumb.
+      label.eventMode = 'static';
+      label.cursor = 'pointer';
+      const w = measure(TABS[i]);
+      label.hitArea = {
+        contains: (px, py) => px >= -12 && px <= w + 12 && py >= -18 && py <= LINE_H + 18,
+      };
+      label.on('pointertap', () => {
+        if (this.tab === i) return;
+        this.tab = i;
+        this.stack = [{ mode: 'root' }];
+        audio.play('cursor');
+        this.refresh();
+      });
       this.tabBar.addChild(label);
       this.tabLabels.push(label);
-      x += measure(TABS[i]) + 9;
+      x += w + 30;
     }
     const underline = new Graphics();
     this.tabBar.addChild(underline);
@@ -103,22 +125,20 @@ export class MenuScene extends Scene {
   }
 
   refreshTabs() {
-    let x = 6;
     for (let i = 0; i < TABS.length; i++) {
       this.tabLabels[i].color = i === this.tab ? UI.accent : UI.dim;
-      x += measure(TABS[i]) + 9;
     }
     const g = this.tabUnderline;
     g.clear();
-    let cx = 6;
-    for (let i = 0; i < this.tab; i++) cx += measure(TABS[i]) + 9;
-    g.rect(cx - 2, 10, measure(TABS[this.tab]) + 4, 1).fill(UI.accent);
+    let cx = 18;
+    for (let i = 0; i < this.tab; i++) cx += measure(TABS[i]) + 30;
+    g.rect(cx - 6, LINE_H + 6, measure(TABS[this.tab]) + 12, 3).fill(UI.accent);
   }
 
   refresh() {
     const { state } = this.game;
     this.goldText.text = `¤ ${state.gold}`;
-    this.goldText.x = this.game.width - 6 - this.goldText.textWidth;
+    this.goldText.x = this.game.width - 24 - this.goldText.textWidth;
     this.refreshTabs();
     const keptIndex = this._keepIndex ? this.list.index : 0;
     this._keepIndex = false;
@@ -132,8 +152,8 @@ export class MenuScene extends Scene {
   }
 
   footerHint() {
-    if (this.mode.mode !== 'root') return 'Z choose    X back';
-    return 'Left/Right switch pages    Z choose    X close';
+    if (this.mode.mode !== 'root') return 'tap a line to choose    ✕ to go back';
+    return 'tap a tab to switch pages    tap a line twice to choose    ✕ to close';
   }
 
   /* --------------------------- list contents --------------------------- */
@@ -231,7 +251,7 @@ export class MenuScene extends Scene {
   renderDetail(item) {
     this.detail.removeChildren();
     const { state, width } = this.game;
-    const w = width - 152;
+    const w = width - this.detail.x - 42;
     const add = (node, x, y) => { node.x = x; node.y = y; this.detail.addChild(node); return node; };
     const line = (text, y, color = UI.ink, maxWidth = w) =>
       add(new PixelText({ text, color, maxWidth }), 0, y);
@@ -240,8 +260,8 @@ export class MenuScene extends Scene {
     if (m.mode === 'gearPick' && item?.itemId) {
       const def = ITEMS[item.itemId];
       line(def.name, 0, UI.accent);
-      line(def.desc, 12, UI.dim);
-      let y = 44;
+      line(def.desc, 41, UI.dim);
+      let y = 510;
       const member = state.member(m.data.charId);
       const current = ITEMS[member.equip[m.data.slot]];
       for (const [k, v] of Object.entries(def.stats ?? {})) {
@@ -250,7 +270,7 @@ export class MenuScene extends Scene {
         const sign = delta > 0 ? '+' : '';
         line(`${k.toUpperCase()}  ${v}   (${sign}${delta})`, y,
           delta > 0 ? UI.good : delta < 0 ? UI.bad : UI.dim);
-        y += 10;
+        y += LINE_H;
       }
       if (def.element) line(`Element: ${ELEMENT_LABEL[def.element]}`, y, UI.dim);
       return;
@@ -262,38 +282,47 @@ export class MenuScene extends Scene {
         const p = state.member(item?.charId ?? item?.value) ?? state.party[0];
         if (!p) return;
         const s = p.maxStats;
-        line(p.name, 0, UI.accent);
-        line(`${p.def.title}  ·  Lv ${p.level}`, 10, UI.dim);
+        // Laid out on a single line-height rhythm so nothing collides as the
+        // pane reflows with the device width.
+        const col = Math.round(w / 2);
+        let ry = 0;
+        line(p.name, ry, UI.accent); ry += LINE_H;
+        line(`${p.def.title}  ·  Lv ${p.level}`, ry, UI.dim); ry += Math.round(LINE_H * 1.4);
 
-        const hpBar = new Bar(88, 5, UI.hp);
+        line(`HP ${p.hp}/${s.hp}`, ry, UI.dim);
+        line(`MP ${p.mp}/${s.mp}`, ry, UI.dim).x = col;
+        ry += LINE_H;
+        const hpBar = new Bar(col - 40, 14, UI.hp);
         hpBar.draw(p.hp / s.hp);
-        add(hpBar, 0, 24);
-        line(`HP ${p.hp}/${s.hp}`, 31, UI.dim);
-        const mpBar = new Bar(88, 5, UI.mp);
+        add(hpBar, 0, ry);
+        const mpBar = new Bar(col - 40, 14, UI.mp);
         mpBar.draw(s.mp ? p.mp / s.mp : 0);
-        add(mpBar, 110, 24);
-        line(`MP ${p.mp}/${s.mp}`, 31, UI.dim).x = 110;
+        add(mpBar, col, ry);
+        ry += Math.round(LINE_H * 1.1);
 
-        const xpBar = new Bar(198, 3, UI.accent);
+        const xpBar = new Bar(w - 20, 9, UI.accent);
         xpBar.draw(p.xpRatio);
-        add(xpBar, 0, 44);
-        line(`next level in ${p.xpToNext} xp`, 50, UI.dim);
+        add(xpBar, 0, ry); ry += Math.round(LINE_H * 0.6);
+        line(`next level in ${p.xpToNext} xp`, ry, UI.dim); ry += Math.round(LINE_H * 1.6);
 
         const stats = [['ATK', s.atk], ['DEF', s.def], ['MAG', s.mag], ['RES', s.res], ['SPD', s.spd], ['LUK', s.luk]];
+        const statCol = Math.round(w / 3);
         stats.forEach(([k, v], i) => {
-          line(`${k} ${String(v).padStart(3)}`, 64 + Math.floor(i / 3) * 10, UI.ink).x = (i % 3) * 46;
+          line(`${k} ${String(v).padStart(3)}`, ry + Math.floor(i / 3) * LINE_H, UI.ink).x = (i % 3) * statCol;
         });
+        ry += LINE_H * 2 + Math.round(LINE_H * 0.6);
 
-        line('Carried', 88, UI.accent);
+        line('Carried', ry, UI.accent); ry += LINE_H;
         ['weapon', 'coat', 'trinket'].forEach((slot, i) => {
-          line(`${slot}: ${itemName(p.equip[slot]) || '—'}`, 99 + i * 10, UI.dim);
+          line(`${slot}: ${itemName(p.equip[slot]) || '—'}`, ry + i * LINE_H, UI.dim);
         });
+        ry += LINE_H * 3 + Math.round(LINE_H * 0.6);
 
-        line('Skills', 132, UI.accent);
+        line('Skills', ry, UI.accent); ry += LINE_H;
         p.skills.slice(0, 6).forEach((id, i) => {
           const sk = SKILLS[id];
-          const node = line(`${sk.name} ${sk.cost}mp`, 143 + Math.floor(i / 2) * 10, UI.ink, 106);
-          node.x = (i % 2) * 112;
+          const node = line(`${sk.name} ${sk.cost}mp`, ry + Math.floor(i / 2) * LINE_H, UI.ink, col - 20);
+          node.x = (i % 2) * col;
         });
         break;
       }
@@ -301,13 +330,13 @@ export class MenuScene extends Scene {
         if (!item?.itemId) { line('Nothing selected.', 0, UI.dim); break; }
         const def = ITEMS[item.itemId];
         line(def.name, 0, UI.accent);
-        line(def.desc, 12, UI.dim);
+        line(def.desc, 41, UI.dim);
         if (def.stats) {
-          let y = 44;
-          for (const [k, v] of Object.entries(def.stats)) { line(`${k.toUpperCase()} +${v}`, y, UI.good); y += 10; }
+          let y = 510;
+          for (const [k, v] of Object.entries(def.stats)) { line(`${k.toUpperCase()} +${v}`, y, UI.good); y += LINE_H; }
         }
-        if (def.kind === 'consumable' && def.usableInField) line('Z to use.', 96, UI.accent);
-        if (def.slot) line('Equip from the Gear page.', 96, UI.dim);
+        if (def.kind === 'consumable' && def.usableInField) line('Z to use.', 326, UI.accent);
+        if (def.slot) line('Equip from the Gear page.', 326, UI.dim);
         break;
       }
       case 'Journal': {
@@ -316,8 +345,8 @@ export class MenuScene extends Scene {
         const def = LEGENDS[id];
         const rec = state.legendRecord(id);
         line(def.name, 0, UI.accent);
-        line(`${def.region}  ·  suggested Lv ${def.recommendedLevel}`, 10, UI.dim);
-        line(def.rumor, 24, UI.ink);
+        line(`${def.region}  ·  suggested Lv ${def.recommendedLevel}`, 34, UI.dim);
+        line(def.rumor, 82, UI.ink);
         const y = 24 + Math.max(3, Math.ceil(def.rumor.length / 52)) * 10 + 6;
         line('Objective', y, UI.accent);
         line(objectiveText(state, id), y + 11, rec.state === LEGEND_STATE.RESOLVED ? UI.good : UI.ink);
@@ -333,31 +362,31 @@ export class MenuScene extends Scene {
       }
       case 'Options':
         line('Options', 0, UI.accent);
-        line('Left/Right adjusts the highlighted line.', 14, UI.dim);
-        line(`Legends told: ${state.resolvedCount}/6`, 40, UI.ink);
-        line(`Days at sea: ${state.day}`, 52, UI.dim);
-        line(`Steps: ${state.steps}`, 64, UI.dim);
-        if (state.ngPlus) line(`New Game + ${state.ngPlus}`, 76, UI.accent);
+        line('Left/Right adjusts the highlighted line.', 48, UI.dim);
+        line(`Legends told: ${state.resolvedCount}/6`, 136, UI.ink);
+        line(`Days at sea: ${state.day}`, 177, UI.dim);
+        line(`Steps: ${state.steps}`, 218, UI.dim);
+        if (state.ngPlus) line(`New Game + ${state.ngPlus}`, 258, UI.accent);
         break;
       case 'Save': {
         const slots = slotSummaries();
         const s = slots[item?.value ?? 0];
         line('Save the voyage', 0, UI.accent);
         if (s) {
-          line(`${s.leader}  Lv ${s.level}`, 16);
-          line(`${s.where}  ·  day ${s.day}`, 28, UI.dim);
-          line(`Legends ${s.legends}/6   ¤${s.gold}`, 40, UI.dim);
-          line(`Played ${formatPlayTime(s.playTimeMs ?? 0)}`, 52, UI.dim);
-          line('Choosing this log overwrites it.', 72, UI.bad);
+          line(`${s.leader}  Lv ${s.level}`, 54);
+          line(`${s.where}  ·  day ${s.day}`, 95, UI.dim);
+          line(`Legends ${s.legends}/6   ¤${s.gold}`, 136, UI.dim);
+          line(`Played ${formatPlayTime(s.playTimeMs ?? 0)}`, 177, UI.dim);
+          line('Choosing this log overwrites it.', 245, UI.bad);
         } else {
-          line('Empty log.', 16, UI.dim);
+          line('Empty log.', 54, UI.dim);
         }
         break;
       }
       case 'Help':
         line('Controls', 0, UI.accent);
-        line('Battles reward reading the enemy: strike an elemental weakness to strip a Guard pip. At zero pips the enemy Breaks — it loses a turn and takes half again as much damage.', 16, UI.ink);
-        line('Rook’s Read the Wind reveals weaknesses for the whole crew.', 72, UI.dim);
+        line('Battles reward reading the enemy: strike an elemental weakness to strip a Guard pip. At zero pips the enemy Breaks — it loses a turn and takes half again as much damage.', 54, UI.ink);
+        line('Rook’s Read the Wind reveals weaknesses for the whole crew.', 245, UI.dim);
         line('Rest at an inn to heal, pass the time, and save.', 94, UI.dim);
         break;
       default:

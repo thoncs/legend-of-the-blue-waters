@@ -88,15 +88,28 @@ for (let i = 0; i < 90; i++) {
 if (await sceneName() !== 'FieldScene') errors.push('battle never resolved into FieldScene');
 await shot('04-field');
 
+// Clear the opening notice before anything else; the field swallows the log
+// button while a conversation is up.
+for (let i = 0; i < 12; i++) {
+  const talking = await page.evaluate(() => !!window.__lotbw.scenes.current?.talking);
+  if (!talking) break;
+  await tap('confirm');
+}
+
 // Walk a little so the camera and animation frames are exercised.
 await page.evaluate(() => window.__lotbw.input.setStick(1, 0));
 await settle(700);
 await page.evaluate(() => window.__lotbw.input.setStick(0, 0));
 await shot('05-field-walk');
 
-// The ship's log.
+// The ship's log. Scene pushes are async, so wait for it rather than
+// sampling the stack the instant after the tap.
 await tap('menu');
-if (await sceneName() !== 'MenuScene') errors.push('log did not open');
+const opened = await page
+  .waitForFunction(() => window.__lotbw.scenes.current?.constructor?.name === 'MenuScene',
+    null, { timeout: 5000 })
+  .then(() => true, () => false);
+if (!opened) errors.push('log did not open');
 await shot('06-menu');
 await tap('cancel');
 

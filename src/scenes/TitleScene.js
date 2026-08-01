@@ -3,12 +3,13 @@
  */
 import { Container, Graphics, Sprite } from 'pixi.js';
 import { Scene } from '../core/scene.js';
-import { PixelText, measure } from '../core/font.js';
+import { PixelText, measure, LINE_H } from '../core/font.js';
 import { MenuList, Panel, UI, Blinker } from '../core/ui.js';
 import { CONTROL_HELP, input } from '../core/input.js';
 import { audio } from '../core/audio.js';
 import { slotSummaries, loadGame, formatPlayTime, deleteSlot } from '../core/save.js';
 import { rng } from '../core/rng.js';
+import { TILE } from '../core/art.js';
 
 export class TitleScene extends Scene {
   onEnter() {
@@ -18,12 +19,12 @@ export class TitleScene extends Scene {
     this.sky = new Graphics();
     this.addChild(this.sky);
     const bands = [
-      [0x0a1526, 0], [0x102340, 34], [0x1b3358, 58], [0x2b4a72, 74],
-      [0x476a90, 86], [0x6a89a8, 96],
+      [0x0a1526, 0], [0x102340, 102], [0x1b3358, 174], [0x2b4a72, 222],
+      [0x476a90, 258], [0x6a89a8, 288],
     ];
     for (let i = 0; i < bands.length; i++) {
       const [color, y] = bands[i];
-      const next = bands[i + 1]?.[1] ?? 108;
+      const next = bands[i + 1]?.[1] ?? 324;
       this.sky.rect(0, y, width, next - y).fill(color);
     }
 
@@ -33,7 +34,7 @@ export class TitleScene extends Scene {
     for (let i = 0; i < 70; i++) {
       const s = new Sprite(art.tex('fx:dot'));
       s.x = Math.floor(rng() * width);
-      s.y = Math.floor(Math.pow(rng(), 1.8) * 92);
+      s.y = Math.floor(Math.pow(rng(), 1.8) * 276);
       s.alpha = 0.25 + rng() * 0.75;
       s.tint = rng() < 0.15 ? 0xffe6a8 : 0xdff0ff;
       this.stars.addChild(s);
@@ -41,29 +42,32 @@ export class TitleScene extends Scene {
 
     // Moon with a soft halo.
     const moon = new Graphics();
-    moon.circle(348, 20, 15).fill({ color: 0xdfefff, alpha: 0.09 });
-    moon.circle(348, 20, 10).fill({ color: 0xdfefff, alpha: 0.15 });
-    moon.circle(348, 20, 7).fill(0xe8f4ff);
-    moon.circle(345, 17, 2).fill({ color: 0xc4d8ea, alpha: 0.7 });
-    moon.circle(351, 23, 1).fill({ color: 0xc4d8ea, alpha: 0.6 });
+    const mx = Math.round(width * 0.86);
+    moon.circle(mx, 62, 52).fill({ color: 0xdfefff, alpha: 0.07 });
+    moon.circle(mx, 62, 34).fill({ color: 0xdfefff, alpha: 0.12 });
+    moon.circle(mx, 62, 21).fill(0xe8f4ff);
+    moon.circle(mx - 8, 53, 6).fill({ color: 0xc4d8ea, alpha: 0.7 });
+    moon.circle(mx + 9, 69, 4).fill({ color: 0xc4d8ea, alpha: 0.6 });
     this.addChild(moon);
 
     // Distant island silhouettes.
     const land = new Graphics();
-    land.poly([0, 108, 26, 92, 44, 100, 70, 86, 96, 104, 120, 108]).fill(0x0d1b2a);
-    land.poly([250, 108, 272, 90, 296, 98, 320, 84, 350, 102, 384, 96, 384, 108]).fill(0x0d1b2a);
+    const H = 324;
+    land.poly([0, H, 78, 276, 132, 300, 210, 258, 288, 312, 360, H]).fill(0x0d1b2a);
+    land.poly([width - 402, H, width - 336, 270, width - 264, 294, width - 192, 252,
+      width - 102, 306, width, 288, width, H]).fill(0x0d1b2a);
     this.addChild(land);
 
     // Sea: rows of animated moonlit water.
     this.sea = new Container();
-    this.sea.y = 104;
+    this.sea.y = 312;
     this.addChild(this.sea);
     this.waterSprites = [];
-    for (let row = 0; row < 8; row++) {
-      for (let col = -1; col < width / 16 + 1; col++) {
+    for (let row = 0; row < Math.ceil((height - 312) / TILE) + 1; row++) {
+      for (let col = -1; col < width / TILE + 1; col++) {
         const s = new Sprite(art.tex('tile:moonsea0'));
-        s.x = col * 16;
-        s.y = row * 16;
+        s.x = col * TILE;
+        s.y = row * TILE;
         s.tint = row < 2 ? 0x8fa8c8 : 0xffffff;
         this.sea.addChild(s);
         this.waterSprites.push(s);
@@ -72,12 +76,12 @@ export class TitleScene extends Scene {
 
     // Glitter path under the moon.
     this.glitter = new Container();
-    this.glitter.y = 104;
+    this.glitter.y = 312;
     this.addChild(this.glitter);
-    for (let i = 0; i < 40; i++) {
-      const g = new Sprite(art.tex('fx:dot'));
-      g.x = 344 + Math.round((rng() - 0.5) * 42);
-      g.y = Math.round(rng() * 100);
+    for (let i = 0; i < 70; i++) {
+      const g = new Sprite(art.tex('fx:mote'));
+      g.x = Math.round(width * 0.86) + Math.round((rng() - 0.5) * 150);
+      g.y = Math.round(rng() * (height - 312));
       g.tint = 0xdfefff;
       g.alpha = 0.2 + rng() * 0.6;
       this.glitter.addChild(g);
@@ -85,9 +89,9 @@ export class TitleScene extends Scene {
 
     // The Salt Wren.
     this.ship = new Sprite(art.ship(0, 'left'));
-    this.ship.scale.set(2);
-    this.ship.x = 44;
-    this.ship.y = 112;
+    this.ship.scale.set(1.4);
+    this.ship.x = Math.round(width * 0.14);
+    this.ship.y = 262;
     this.addChild(this.ship);
 
     // --- title ---
@@ -95,49 +99,54 @@ export class TitleScene extends Scene {
     this.addChild(this.titleWrap);
 
     const main = new PixelText({ text: 'LEGEND OF THE', color: 0xdfefff, accent: UI.accent, shadow: true });
-    main.scale.set(2);
-    main.x = Math.round((width - measure('LEGEND OF THE') * 2) / 2);
-    main.y = 16;
+    main.scale.set(1.5);
+    main.x = Math.round((width - measure('LEGEND OF THE') * 1.5) / 2);
+    main.y = 42;
 
     const sub = new PixelText({ text: 'BLUE WATERS', color: UI.accent, shadow: true });
-    sub.scale.set(3);
-    sub.x = Math.round((width - measure('BLUE WATERS') * 3) / 2);
-    sub.y = 34;
+    sub.scale.set(2.6);
+    sub.x = Math.round((width - measure('BLUE WATERS') * 2.6) / 2);
+    sub.y = 82;
 
     const rule = new Graphics();
-    rule.rect(Math.round(width / 2) - 78, 62, 156, 1).fill({ color: 0x6f9fc0, alpha: 0.8 });
-    rule.rect(Math.round(width / 2) - 3, 60, 6, 5).fill(UI.accent);
+    rule.rect(Math.round(width / 2) - 240, 172, 480, 3).fill({ color: 0x6f9fc0, alpha: 0.8 });
+    rule.rect(Math.round(width / 2) - 9, 166, 18, 15).fill(UI.accent);
 
     const tag = new PixelText({ text: 'six legends of the Sunder Reach', color: 0xa8c4dc });
     tag.x = Math.round((width - measure('six legends of the Sunder Reach')) / 2);
-    tag.y = 68;
+    tag.y = 192;
 
     this.titleWrap.addChild(main, sub, rule, tag);
 
     // --- menu ---
-    this.menuPanel = new Panel(150, 76);
-    this.menuPanel.x = 117;
-    this.menuPanel.y = 118;
+    const rowH = this.game.touchUnit;
+    const menuW = 520;
+    const items = this.mainItems();
+    const menuH = items.length * rowH + 36;
+    this.menuPanel = new Panel(menuW, menuH);
+    this.menuPanel.x = Math.round((width - menuW) / 2);
+    this.menuPanel.y = Math.round(height - menuH - 96);
     this.addChild(this.menuPanel);
 
     this.menu = new MenuList({
-      items: this.mainItems(),
-      width: 138,
+      items,
+      width: menuW - 42,
       rows: 5,
-      rowHeight: 12,
+      rowHeight: rowH,
+      touchHeight: rowH,
       onSelect: (item) => this.onMenu(item.value),
     });
-    this.menu.x = 123;
-    this.menu.y = 124;
+    this.menu.x = this.menuPanel.x + 21;
+    this.menu.y = this.menuPanel.y + 18;
     this.addChild(this.menu);
 
     const hintBar = new Graphics();
-    hintBar.rect(0, height - 16, width, 16).fill({ color: 0x050c16, alpha: 0.72 });
+    hintBar.rect(0, height - 48, width, 48).fill({ color: 0x050c16, alpha: 0.72 });
     this.addChild(hintBar);
 
-    this.hint = new Blinker('Z / Enter — choose      X — back      H — controls', 0x8fa8bc);
+    this.hint = new Blinker('tap a line to highlight it, tap again to choose', 0x8fa8bc);
     this.hint.x = Math.round((width - this.hint.textWidth) / 2);
-    this.hint.y = height - 12;
+    this.hint.y = height - 36;
     this.addChild(this.hint);
 
     this.mode = 'main';
@@ -236,14 +245,16 @@ export class TitleScene extends Scene {
   showHelp() {
     const items = CONTROL_HELP.map(([keys, what]) => ({ label: keys, right: what, disabled: true }));
     items.push({ label: 'Back', value: 'back' });
-    this.openOverlay('Controls', items, () => this.closeOverlay(), 290, 11);
+    this.openOverlay('Controls', items, () => this.closeOverlay(), 1020, 11);
   }
 
-  openOverlay(title, items, onSelect, width = 250, rows = 4) {
+  openOverlay(title, items, onSelect, width = 760, rows = 4) {
     this.closeOverlay();
-    const { width: W, height: H } = this.game;
-    const rowH = 11;
-    const panelH = Math.min(rows, items.length) * rowH + 20;
+    const { width: W, height: H, touchUnit } = this.game;
+    // Informational overlays (the control list) pack tighter than menus.
+    const rowH = rows > 6 ? Math.round(LINE_H * 1.5) : touchUnit;
+    width = Math.min(width, W - 96);
+    const panelH = Math.min(rows, items.length) * rowH + 72;
     const c = new Container();
     const shade = new Graphics();
     shade.rect(0, 0, W, H).fill({ color: 0x000000, alpha: 0.55 });
@@ -255,14 +266,15 @@ export class TitleScene extends Scene {
 
     const menu = new MenuList({
       items,
-      width: width - 12,
+      width: width - 42,
       rows: Math.min(rows, items.length),
       rowHeight: rowH,
+      touchHeight: touchUnit,
       onSelect,
       onCancel: () => this.closeOverlay(),
     });
-    menu.x = panel.x + 6;
-    menu.y = panel.y + 10;
+    menu.x = panel.x + 21;
+    menu.y = panel.y + 48;
     // Skip past any purely informational rows.
     if (items[0]?.disabled) {
       const firstEnabled = items.findIndex((i) => !i.disabled);
