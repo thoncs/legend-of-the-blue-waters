@@ -229,6 +229,17 @@ export class Pen {
     this.w = w;
     this.h = h;
     this.data = new Uint8ClampedArray(w * h * 4);
+    /**
+     * Added to every noise seed this pen uses. Set it before drawing to get a
+     * different cut of the same tile without touching the art function.
+     */
+    this.seedShift = 0;
+    /**
+     * Shape scale. Art written for a small cell can be drawn into a larger one
+     * by setting this: coordinates, radii and thicknesses all multiply, so
+     * curves are recomputed at the higher resolution rather than upscaled.
+     */
+    this.k = 1;
   }
 
   index(x, y) {
@@ -276,11 +287,19 @@ export class Pen {
   }
 
   px(x, y, color, alpha = 1) {
+    if (this.k !== 1) return this.rect(x, y, 1, 1, color, alpha);
+    const [r, g, b, a] = parseColor(color);
+    this.blend(Math.round(x), Math.round(y), r, g, b, a * alpha);
+  }
+
+  /** Write one buffer pixel, ignoring `k`. Used by the scaled primitives. */
+  raw(x, y, color, alpha = 1) {
     const [r, g, b, a] = parseColor(color);
     this.blend(Math.round(x), Math.round(y), r, g, b, a * alpha);
   }
 
   rect(x, y, w, h, color, alpha = 1) {
+    if (this.k !== 1) { x *= this.k; y *= this.k; w *= this.k; h *= this.k; }
     const [r, g, b, a] = parseColor(color);
     const al = a * alpha;
     if (al <= 0) return;
@@ -294,6 +313,10 @@ export class Pen {
   }
 
   line(x0, y0, x1, y1, color, alpha = 1) {
+    if (this.k !== 1) {
+      // Scaled lines are drawn as thick strokes so they do not thin out.
+      return this.stroke(x0, y0, x1, y1, 1, color, alpha);
+    }
     let x = Math.round(x0);
     let y = Math.round(y0);
     const ex = Math.round(x1);
@@ -315,15 +338,20 @@ export class Pen {
 
   /** Thick line, drawn as a run of discs. */
   stroke(x0, y0, x1, y1, width, color, alpha = 1) {
-    const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
-    const r = width / 2;
+    const k = this.k;
+    const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * k * 2));
+    const r = Math.max(0.5, (width * k) / 2);
+    const saved = this.k;
+    this.k = 1;
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
-      this.ellipse(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, r, r, color, alpha);
+      this.ellipse((x0 + (x1 - x0) * t) * k, (y0 + (y1 - y0) * t) * k, r, r, color, alpha);
     }
+    this.k = saved;
   }
 
   ellipse(cx, cy, rx, ry, color, alpha = 1) {
+    if (this.k !== 1) { cx *= this.k; cy *= this.k; rx *= this.k; ry *= this.k; }
     const RX = Math.max(0.5, rx);
     const RY = Math.max(0.5, ry);
     const x0 = Math.max(0, Math.floor(cx - RX));
@@ -334,13 +362,24 @@ export class Pen {
       for (let x = x0; x <= x1; x++) {
         const dx = (x - cx) / RX;
         const dy = (y - cy) / RY;
-        if (dx * dx + dy * dy <= 1.02) this.px(x, y, color, alpha);
+        if (dx * dx + dy * dy <= 1.02) this.raw(x, y, color, alpha);
       }
     }
   }
 
   /** Filled convex-ish polygon via scanline. */
   poly(points, color, alpha = 1) {
+    if (this.k !== 1) points = points.map(([px, py]) => [px * this.k, py * this.k]);
+    const saved = this.k;
+    this.k = 1;
+    try {
+      this._polyScan(points, color, alpha);
+    } finally {
+      this.k = saved;
+    }
+  }
+
+  _polyScan(points, color, alpha) {
     let minY = Infinity;
     let maxY = -Infinity;
     for (const [, py] of points) {
@@ -412,6 +451,7 @@ export class Pen {
    * a ramp. This is what replaces the old flat `fill` + `speckle` pair.
    */
   material(ramp, { seed = 1, lo = 1, hi = 4, octaves = 3, cells = 3, size = this.w, contrast = 1 } = {}) {
+    seed += this.seedShift;
     const span = hi - lo;
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
@@ -427,6 +467,7 @@ export class Pen {
 
   /** Scatter single pixels, seamlessly across tile edges. */
   speckle(color, density, seed = 0, alpha = 1) {
+    seed += this.seedShift;
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
         if (hash(x, y, seed) < density) this.px(x, y, color, alpha);

@@ -32,12 +32,21 @@ const BACKDROPS = {
   void: { sky: [0x07080f, 0x0d1020, 0x1a2038], ground: 0x141826, groundLit: 0x222840, silhouette: 0x030408, motif: 'none' },
 };
 
+/**
+ * Staging positions as fractions of the stage, so the diorama reflows with
+ * the device aspect instead of assuming a 384-wide screen.
+ */
 const ENEMY_SLOTS = [
-  { x: 62, y: 128 }, { x: 118, y: 116 }, { x: 44, y: 100 }, { x: 132, y: 148 },
+  { fx: 0.19, fy: 0.74 }, { fx: 0.33, fy: 0.66 }, { fx: 0.13, fy: 0.60 }, { fx: 0.38, fy: 0.84 },
 ];
 const PARTY_SLOTS = [
-  { x: 268, y: 100 }, { x: 290, y: 122 }, { x: 312, y: 144 },
+  { fx: 0.68, fy: 0.62 }, { fx: 0.745, fy: 0.72 }, { fx: 0.81, fy: 0.82 },
 ];
+
+/** Resolve a fractional slot against the live stage size. */
+function slotPos(slot, w, h) {
+  return { x: Math.round(slot.fx * w), y: Math.round(slot.fy * h) };
+}
 
 /** Turn-order chips and status rows need a name that fits in ~8 characters. */
 function shortName(full) {
@@ -89,7 +98,7 @@ export class BattleScene extends Scene {
       this.setMessage(params.introText);
       this.bannerText.text = params.introText;
       this.bannerText.x = Math.round((width - this.bannerText.textWidth) / 2);
-      this.bannerText.y = 94;
+      this.bannerText.y = height * 0.4 + 22;
       this.banner.visible = true;
     }
 
@@ -107,67 +116,80 @@ export class BattleScene extends Scene {
   buildBackdrop(kind) {
     const { width, height, art } = this.game;
     const def = BACKDROPS[kind] ?? BACKDROPS.shore;
+
+    // The backdrop is composed in a 216-tall design space and scaled up, so
+    // the motifs keep their proportions whatever aspect the device has.
+    const K = height / 216;
+    const dw = width / K;
+    const design = new Container();
+    design.scale.set(K);
+    this.backdrop.addChild(design);
+    // Spread a 384-space x coordinate across the real design width.
+    const X = (v) => (v * dw) / 384;
+
     const g = new Graphics();
     const horizon = 104;
-    g.rect(0, 0, width, 36).fill(def.sky[0]);
-    g.rect(0, 36, width, 34).fill(def.sky[1]);
-    g.rect(0, 70, width, horizon - 70).fill(def.sky[2]);
-    g.rect(0, horizon, width, height - horizon).fill(def.ground);
+    g.rect(0, 0, dw, 36).fill(def.sky[0]);
+    g.rect(0, 36, dw, 34).fill(def.sky[1]);
+    g.rect(0, 70, dw, horizon - 70).fill(def.sky[2]);
+    g.rect(0, horizon, dw, 216 - horizon).fill(def.ground);
     // Dithered band where ground meets sky, so the seam reads as depth.
     for (let y = 0; y < 10; y++) {
-      for (let x = (y % 2); x < width; x += 2) {
+      for (let x = (y % 2); x < dw; x += 2) {
         g.rect(x, horizon + y, 1, 1).fill({ color: def.groundLit, alpha: 1 - y / 12 });
       }
     }
-    g.rect(0, horizon + 10, width, height - horizon - 10).fill(def.groundLit);
+    g.rect(0, horizon + 10, dw, 216 - horizon - 10).fill(def.groundLit);
     // Scatter over the ground so the lower half is not a flat slab of colour.
-    for (let i = 0; i < 260; i++) {
-      const x = Math.floor(rng() * width);
+    for (let i = 0; i < 320; i++) {
+      const x = Math.floor(rng() * dw);
       const depth = rng();
-      const y = horizon + 8 + Math.floor(depth * depth * (height - horizon - 8));
+      const y = horizon + 8 + Math.floor(depth * depth * (216 - horizon - 8));
       const w = 1 + Math.floor(rng() * 2);
       g.rect(x, y, w, 1).fill({ color: rng() < 0.5 ? def.ground : def.silhouette, alpha: 0.18 + rng() * 0.3 });
     }
     // A darker apron at the very bottom keeps the UI panels legible.
     for (let y = 0; y < 22; y++) {
-      g.rect(0, height - 22 + y, width, 1).fill({ color: def.silhouette, alpha: (y / 22) * 0.5 });
+      g.rect(0, 216 - 22 + y, dw, 1).fill({ color: def.silhouette, alpha: (y / 22) * 0.5 });
     }
-    this.backdrop.addChild(g);
+    design.addChild(g);
 
     // Parallax silhouettes.
     const sil = new Graphics();
     if (def.motif === 'palms') {
-      for (const x of [22, 60, 300, 348]) {
+      for (const x of [X(22), X(60), X(300), X(348)]) {
         sil.rect(x, 58, 3, 40).fill(def.silhouette);
         for (const [dx, dy] of [[-12, -6], [-7, -11], [0, -13], [7, -11], [12, -6]]) {
           sil.rect(x + dx, 58 + dy, 8, 3).fill(def.silhouette);
         }
       }
     } else if (def.motif === 'trees') {
-      for (let i = 0; i < 9; i++) {
+      const count = Math.ceil(dw / 46) + 1;
+      for (let i = 0; i < count; i++) {
         const x = i * 46 + 8;
         sil.rect(x + 8, 62, 4, 36).fill(def.silhouette);
         sil.ellipse(x + 10, 58, 20, 14).fill(def.silhouette);
       }
     } else if (def.motif === 'pillars') {
-      for (const x of [30, 84, 292, 346]) {
+      for (const x of [X(30), X(84), X(292), X(346)]) {
         sil.rect(x, 40, 14, 58).fill(def.silhouette);
         sil.rect(x - 3, 36, 20, 5).fill(def.silhouette);
       }
     } else if (def.motif === 'wrecks') {
       // A half-sunk hull with two broken masts leaning out of the shallows.
-      sil.poly([128, 96, 140, 78, 232, 74, 250, 96]).fill(def.silhouette);
-      sil.rect(174, 46, 4, 30).fill(def.silhouette);
-      sil.poly([178, 50, 200, 58, 178, 66]).fill(def.silhouette);
-      sil.poly([4, 96, 26, 40, 36, 42, 44, 96]).fill(def.silhouette);
-      sil.poly([310, 96, 336, 34, 346, 38, 366, 96]).fill(def.silhouette);
-      sil.rect(0, 92, width, 4).fill(def.silhouette);
+      sil.poly([X(128), 96, X(140), 78, X(232), 74, X(250), 96]).fill(def.silhouette);
+      sil.rect(X(174), 46, 4, 30).fill(def.silhouette);
+      sil.poly([X(178), 50, X(200), 58, X(178), 66]).fill(def.silhouette);
+      sil.poly([X(4), 96, X(26), 40, X(36), 42, X(44), 96]).fill(def.silhouette);
+      sil.poly([X(310), 96, X(336), 34, X(346), 38, X(366), 96]).fill(def.silhouette);
+      sil.rect(0, 92, dw, 4).fill(def.silhouette);
     } else if (def.motif === 'peaks') {
-      sil.poly([-10, 96, 60, 34, 120, 96]).fill(def.silhouette);
-      sil.poly([210, 96, 300, 20, 394, 96]).fill(def.silhouette);
+      sil.poly([X(-10), 96, X(60), 34, X(120), 96]).fill(def.silhouette);
+      sil.poly([X(210), 96, X(300), 20, X(394), 96]).fill(def.silhouette);
     } else if (def.motif === 'coral') {
       // Branching fans rather than posts.
-      for (const [x, h] of [[16, 34], [58, 24], [96, 40], [286, 30], [330, 44], [364, 26]]) {
+      for (const [x0, h] of [[16, 34], [58, 24], [96, 40], [286, 30], [330, 44], [364, 26]]) {
+        const x = X(x0);
         const base = 96;
         sil.rect(x - 1, base - h, 3, h).fill(def.silhouette);
         for (let b = 0; b < 4; b++) {
@@ -178,47 +200,46 @@ export class BattleScene extends Scene {
         }
         sil.ellipse(x, base - h - 1, 5, 4).fill(def.silhouette);
       }
-      sil.rect(0, 94, width, 2).fill(def.silhouette);
+      sil.rect(0, 94, dw, 2).fill(def.silhouette);
     }
     // The motifs are drawn against a 96px horizon; nudge them onto the real one.
     sil.y = 8;
-    this.backdrop.addChild(sil);
+    design.addChild(sil);
     this.silhouette = sil;
+    this.backdropDesign = design;
 
     // A few drifting motes for atmosphere.
     this.motes = [];
-    for (let i = 0; i < 22; i++) {
-      const s = new Sprite(art.tex('fx:dot'));
+    for (let i = 0; i < 30; i++) {
+      const s = new Sprite(art.tex('fx:mote'));
       s.x = rng() * width;
-      s.y = 20 + rng() * (height - 40);
+      s.y = 60 + rng() * (height - 120);
       s.alpha = 0.12 + rng() * 0.3;
       s.tint = kind === 'volcano' ? 0xffb03a : kind === 'void' ? 0xb9a6ff : 0xdff0ff;
       this.backdrop.addChild(s);
-      this.motes.push({ s, vy: -4 - rng() * 8, vx: (rng() - 0.5) * 6 });
+      this.motes.push({ s, vy: -12 - rng() * 24, vx: (rng() - 0.5) * 18 });
     }
   }
 
-  /* -------------------------- combatants ---------------------------- */
-
   buildCombatants() {
-    const { art } = this.game;
+    const { art, width, height } = this.game;
 
     this.battle.enemies.forEach((e, i) => this.addEnemySprite(e, i));
 
     this.battle.party.forEach((p, i) => {
-      const slot = PARTY_SLOTS[i] ?? PARTY_SLOTS[PARTY_SLOTS.length - 1];
+      const slot = slotPos(PARTY_SLOTS[i] ?? PARTY_SLOTS[PARTY_SLOTS.length - 1], width, height);
       const holder = new Container();
       const shadow = new Sprite(art.tex('fx:shadow'));
-      shadow.x = -11;
-      shadow.y = -3;
-      shadow.scale.set(1.4, 1.1);
+      shadow.x = -34;
+      shadow.y = -10;
+      shadow.scale.set(1.5, 1.2);
       shadow.alpha = 0.5;
-      // Heroes are 16px overworld sprites; doubled here so they read at the
-      // same scale as the 32-64px battlers facing them.
+      // Overworld actors are natively 48x72 now; at 1.5x they carry the same
+      // visual weight as the 96-192px battlers facing them.
       const sprite = new Sprite(art.actor(p.style, 'left', 0));
-      sprite.scale.set(2);
-      sprite.x = -16;
-      sprite.y = -32;
+      sprite.scale.set(1.5);
+      sprite.x = -36;
+      sprite.y = -108;
       holder.addChild(shadow, sprite);
       holder.x = slot.x;
       holder.y = slot.y;
@@ -228,8 +249,8 @@ export class BattleScene extends Scene {
   }
 
   addEnemySprite(e, i) {
-    const { art } = this.game;
-    const slot = ENEMY_SLOTS[i % ENEMY_SLOTS.length];
+    const { art, width, height } = this.game;
+    const slot = slotPos(ENEMY_SLOTS[i % ENEMY_SLOTS.length], width, height);
     const holder = new Container();
     const tex = art.battler(e.art);
     // Bosses loom: the same art at 1.5x reads as a different weight class.
@@ -238,8 +259,8 @@ export class BattleScene extends Scene {
     const h = tex.height * scale;
     const shadow = new Sprite(art.tex('fx:shadow'));
     shadow.x = -Math.round(w * 0.35);
-    shadow.y = -2;
-    shadow.scale.set(Math.max(1, w / 22), 1);
+    shadow.y = -6;
+    shadow.scale.set(Math.max(1, w / 60), 1.1);
     shadow.alpha = 0.45;
     const sprite = new Sprite(tex);
     sprite.scale.set(scale);
@@ -248,6 +269,13 @@ export class BattleScene extends Scene {
     holder.addChild(shadow, sprite);
     holder.x = slot.x;
     holder.y = slot.y;
+    // Tap an enemy to pick it as the target.
+    holder.eventMode = 'static';
+    holder.cursor = 'pointer';
+    holder.hitArea = {
+      contains: (px, py) => px >= -w / 2 && px <= w / 2 && py >= -h && py <= 8,
+    };
+    holder.on('pointertap', () => this.onEnemyTapped(e));
     this.enemyLayer.addChild(holder);
     this.sprites.set(e.key, { holder, sprite, home: { x: slot.x, y: slot.y }, flash: 0, bob: rng() * 6.28 });
   }
@@ -258,89 +286,92 @@ export class BattleScene extends Scene {
     const { width, height } = this.game;
 
     // Message strip.
-    this.msgPanel = new Panel(width - 12, 18);
-    this.msgPanel.x = 6;
-    this.msgPanel.y = 4;
+    this.msgPanel = new Panel(width - 36, 54);
+    this.msgPanel.x = 18;
+    this.msgPanel.y = 12;
     this.ui.addChild(this.msgPanel);
-    this.msgText = new PixelText({ text: '', color: UI.ink, maxWidth: width - 26 });
-    this.msgText.x = 12;
-    this.msgText.y = 9;
+    this.msgText = new PixelText({ text: '', color: UI.ink, maxWidth: width - 72 });
+    this.msgText.x = 36;
+    this.msgText.y = 28;
     this.ui.addChild(this.msgText);
 
     // Turn order strip.
     this.orderStrip = new Container();
-    this.orderStrip.x = 6;
-    this.orderStrip.y = 24;
+    this.orderStrip.x = 18;
+    this.orderStrip.y = 78;
     this.ui.addChild(this.orderStrip);
 
     // Party status.
-    const rowH = 18;
-    this.statusPanel = new Panel(124, 10 + this.battle.party.length * rowH);
-    this.statusPanel.x = width - 128;
-    this.statusPanel.y = height - this.statusPanel.panelHeight - 4;
+    const rowH = 54;
+    this.statusPanel = new Panel(372, 30 + this.battle.party.length * rowH);
+    this.statusPanel.x = width - 384;
+    this.statusPanel.y = height - this.statusPanel.panelHeight - 12;
     this.ui.addChild(this.statusPanel);
 
     this.statusRows = this.battle.party.map((p, i) => {
       const row = new Container();
-      row.x = this.statusPanel.x + 6;
-      row.y = this.statusPanel.y + 5 + i * rowH;
+      row.x = this.statusPanel.x + 18;
+      row.y = this.statusPanel.y + 15 + i * rowH;
       const name = new PixelText({ text: shortName(p.name), color: UI.ink });
       const hpText = new PixelText({ text: '', color: UI.dim });
       hpText.x = 0;
-      hpText.y = 9;
-      const hpBar = new Bar(58, 5, UI.hp);
-      hpBar.x = 46;
-      hpBar.y = 0;
-      const mpBar = new Bar(58, 3, UI.mp);
-      mpBar.x = 46;
-      mpBar.y = 8;
+      hpText.y = 28;
+      const hpBar = new Bar(160, 14, UI.hp);
+      hpBar.x = 150;
+      hpBar.y = 2;
+      const mpBar = new Bar(160, 9, UI.mp);
+      mpBar.x = 150;
+      mpBar.y = 24;
       const statusText = new PixelText({ text: '', color: UI.accent });
-      statusText.x = 108;
-      statusText.y = 8;
+      statusText.x = 320;
+      statusText.y = 20;
       row.addChild(name, hpText, hpBar, mpBar, statusText);
       this.ui.addChild(row);
       return { row, name, hpBar, mpBar, hpText, statusText, combatant: p };
     });
 
     // Command menu.
-    this.cmdPanel = new Panel(96, 74);
-    this.cmdPanel.x = 6;
-    this.cmdPanel.y = height - 78;
+    const cmdH = this.game.touchUnit * 5 + 24;
+    this.cmdPanel = new Panel(300, cmdH);
+    this.cmdPanel.x = 18;
+    this.cmdPanel.y = height - cmdH - 12;
     this.cmdPanel.visible = false;
     this.ui.addChild(this.cmdPanel);
 
     this.cmdMenu = new MenuList({
-      items: [], width: 84, rows: 5, rowHeight: 12,
+      items: [], width: 264, rows: 5, rowHeight: this.game.touchUnit,
+      touchHeight: this.game.touchUnit,
       onSelect: (item) => this.onCommand(item),
       onCancel: () => this.onCommandCancel(),
       onMove: (item) => this.describeCommand(item),
     });
-    this.cmdMenu.x = 12;
-    this.cmdMenu.y = height - 72;
+    this.cmdMenu.x = 36;
+    this.cmdMenu.y = this.cmdPanel.y + 12;
     this.cmdMenu.visible = false;
     this.ui.addChild(this.cmdMenu);
 
     // Info line for skills/items.
-    this.infoPanel = new Panel(146, 34);
-    this.infoPanel.x = 106;
-    this.infoPanel.y = height - 38;
+    const infoW = Math.max(420, width - 384 - 360);
+    this.infoPanel = new Panel(infoW, 108);
+    this.infoPanel.x = 336;
+    this.infoPanel.y = height - 120;
     this.infoPanel.visible = false;
     this.ui.addChild(this.infoPanel);
-    this.infoText = new PixelText({ text: '', color: UI.dim, maxWidth: 132 });
-    this.infoText.x = 112;
-    this.infoText.y = height - 33;
+    this.infoText = new PixelText({ text: '', color: UI.dim, maxWidth: infoW - 36 });
+    this.infoText.x = 354;
+    this.infoText.y = height - 104;
     this.infoText.visible = false;
     this.ui.addChild(this.infoText);
 
     // Enemy inspection card (shown while targeting).
-    this.targetCard = new Panel(112, 40);
-    this.targetCard.x = 6;
-    this.targetCard.y = 44;
+    this.targetCard = new Panel(336, 120);
+    this.targetCard.x = 18;
+    this.targetCard.y = 132;
     this.targetCard.visible = false;
     this.ui.addChild(this.targetCard);
-    this.targetText = new PixelText({ text: '', color: UI.ink, maxWidth: 100 });
-    this.targetText.x = 12;
-    this.targetText.y = 49;
+    this.targetText = new PixelText({ text: '', color: UI.ink, maxWidth: 300 });
+    this.targetText.x = 36;
+    this.targetText.y = 150;
     this.targetText.visible = false;
     this.ui.addChild(this.targetText);
 
@@ -352,7 +383,7 @@ export class BattleScene extends Scene {
     // Big centred banner (intro / BREAK / victory).
     this.banner = new Container();
     this.bannerBg = new Graphics();
-    this.bannerBg.rect(0, 88, width, 24).fill({ color: 0x000000, alpha: 0.6 });
+    this.bannerBg.rect(0, height * 0.4, width, 72).fill({ color: 0x000000, alpha: 0.6 });
     this.bannerText = new PixelText({ text: '', color: UI.accent, align: 'center' });
     this.banner.addChild(this.bannerBg, this.bannerText);
     this.banner.visible = false;
@@ -393,15 +424,15 @@ export class BattleScene extends Scene {
       const c = upcoming[i];
       if (!c.alive) continue;
       const label = shortName(c.name);
-      const w = measure(label) + 8;
+      const w = measure(label) + 24;
       const g = new Graphics();
-      g.rect(x, 0, w, 11).fill({ color: c.isParty ? 0x1c3a52 : 0x4a2030, alpha: 0.9 });
-      g.rect(x, 0, w, 11).stroke({ color: i === 0 ? UI.accent : 0x3f6f92, width: 1, alignment: 0 });
+      g.rect(x, 0, w, 34).fill({ color: c.isParty ? 0x1c3a52 : 0x4a2030, alpha: 0.9 });
+      g.rect(x, 0, w, 34).stroke({ color: i === 0 ? UI.accent : 0x3f6f92, width: 3, alignment: 0 });
       const t = new PixelText({ text: label, color: i === 0 ? UI.accent : UI.dim });
-      t.x = x + 4;
-      t.y = 2;
+      t.x = x + 12;
+      t.y = 6;
       this.orderStrip.addChild(g, t);
-      x += w + 3;
+      x += w + 9;
     }
   }
 
@@ -574,6 +605,23 @@ export class BattleScene extends Scene {
     this.cmdMenu.enabled = false;
     this.targetCursor.visible = true;
     this.updateTargetCursor();
+  }
+
+  /**
+   * Tapping an enemy picks it. If targeting is already open it moves the
+   * cursor there and commits, which is the whole interaction on touch.
+   */
+  onEnemyTapped(enemy) {
+    const tg = this.targeting;
+    if (!tg) return;
+    const i = tg.pool.indexOf(enemy);
+    if (i < 0) return;
+    tg.index = i;
+    this.updateTargetCursor();
+    audio.play('cursor');
+    const action = { ...tg.action, target: tg.pool[tg.index] };
+    this.hideTargeting();
+    this.submit(action);
   }
 
   hideTargeting() {
@@ -882,7 +930,7 @@ export class BattleScene extends Scene {
     this.battle.enemies.forEach((e, i) => this.addEnemySprite(e, i));
     // Rebind the party status rows to the new battle's combatants.
     this.battle.party.forEach((p, i) => {
-      const slot = PARTY_SLOTS[i] ?? PARTY_SLOTS[PARTY_SLOTS.length - 1];
+      const slot = slotPos(PARTY_SLOTS[i] ?? PARTY_SLOTS[PARTY_SLOTS.length - 1], this.game.width, this.game.height);
       const old = this.partyLayer.children[i];
       this.sprites.set(p.key, {
         holder: old, sprite: old.children[1], home: { x: slot.x, y: slot.y }, flash: 0, bob: rng() * 6.28,

@@ -155,28 +155,29 @@ export class FieldScene extends Scene {
     this.hud = new Container();
     this.addChild(this.hud);
 
-    this.clockPanel = new Panel(58, 14);
-    this.clockPanel.x = width - 62;
-    this.clockPanel.y = 4;
+    this.clockPanel = new Panel(190, 46);
+    this.clockPanel.x = width - 202;
+    this.clockPanel.y = 12;
     this.hud.addChild(this.clockPanel);
     this.clockText = new PixelText({ text: '', color: UI.ink });
-    this.clockText.x = width - 56;
-    this.clockText.y = 7;
+    this.clockText.x = width - 190;
+    this.clockText.y = 24;
     this.hud.addChild(this.clockText);
 
     this.banner = new Container();
-    this.bannerPanel = new Panel(10, 16);
+    this.bannerPanel = new Panel(30, 48);
     this.bannerText = new PixelText({ text: '', color: UI.accent });
     this.banner.addChild(this.bannerPanel, this.bannerText);
-    this.banner.x = 6;
-    this.banner.y = 4;
+    this.banner.x = 18;
+    this.banner.y = 12;
     this.hud.addChild(this.banner);
     this.bannerTime = 0;
 
     // --- dialogue ---
-    this.dialogueBox = new DialogueBox(width - 16, 3);
-    this.dialogueBox.x = 8;
-    this.dialogueBox.y = height - this.dialogueBox.height_ - 6;
+    // Kept clear of the right-hand button cluster so a thumb never covers text.
+    this.dialogueBox = new DialogueBox(width - 48 - this.game.touchUnit * 2.6, 3);
+    this.dialogueBox.x = 24;
+    this.dialogueBox.y = height - this.dialogueBox.height_ - 18;
     this.dialogueBox.visible = false;
     this.addChild(this.dialogueBox);
     this.dialogueBox.charsPerSecond = [26, 42, 64, 999][this.game.options.textSpeed] ?? 64;
@@ -246,10 +247,14 @@ export class FieldScene extends Scene {
         const ch = chars[ty * w + tx];
         const def = TILE_DEFS[ch];
         if (def?.anim) {
-          s.texture = art.tex(`tile:${def.anim[this.animFrame % def.anim.length]}`);
-          this.animTiles.push({ sprite: s, frames: def.anim });
+          // Animated ground keeps one variant for its whole frame cycle.
+          const cut = art.variantSuffix(def.anim[0], tx, ty);
+          s.texture = art.tex(`tile:${def.anim[this.animFrame % def.anim.length]}${cut}`);
+          this.animTiles.push({ sprite: s, frames: def.anim, cut });
         } else {
-          s.texture = art.tex(`tile:${def?.tex ?? 'grass'}`);
+          // Ground picks between interchangeable cuts by map position, so a
+          // field of grass does not read as a grid of one repeated tile.
+          s.texture = art.tileVariant(def?.tex ?? 'grass', tx, ty);
         }
       }
     }
@@ -257,8 +262,8 @@ export class FieldScene extends Scene {
 
   updateAnimTiles() {
     const { art } = this.game;
-    for (const { sprite, frames } of this.animTiles) {
-      sprite.texture = art.tex(`tile:${frames[this.animFrame % frames.length]}`);
+    for (const { sprite, frames, cut } of this.animTiles) {
+      sprite.texture = art.tex(`tile:${frames[this.animFrame % frames.length]}${cut ?? ''}`);
     }
   }
 
@@ -357,9 +362,9 @@ export class FieldScene extends Scene {
 
   showBanner(text) {
     this.bannerText.text = text;
-    this.bannerPanel.resize(this.bannerText.textWidth + 12, 16);
-    this.bannerText.x = 6;
-    this.bannerText.y = 4;
+    this.bannerPanel.resize(this.bannerText.textWidth + 36, 48);
+    this.bannerText.x = 18;
+    this.bannerText.y = 14;
     this.bannerTime = 2600;
     this.banner.alpha = 1;
     this.banner.visible = true;
@@ -1040,30 +1045,31 @@ export class FieldScene extends Scene {
   openChoice(title, items, onSelect) {
     this.closeOverlay();
     const { width, height } = this.game;
-    const w = 250;
-    const rowH = 12;
-    const h = items.length * rowH + 34;
+    const rowH = this.game.touchUnit;
+    const w = Math.min(width - 80, Math.max(560, Math.round(width * 0.5)));
+    const h = items.length * rowH + 104;
     const c = new Container();
     const shade = new Graphics();
     shade.rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0.5 });
     c.addChild(shade);
     const panel = new Panel(w, h, { title });
     panel.x = Math.round((width - w) / 2);
-    panel.y = Math.round((height - h) / 2) - 10;
+    panel.y = Math.round((height - h) / 2) - 24;
     c.addChild(panel);
 
-    const blurb = new PixelText({ text: items[0]?.blurb ?? '', color: UI.dim, maxWidth: w - 16 });
-    blurb.x = panel.x + 8;
-    blurb.y = panel.y + h - 20;
+    const blurb = new PixelText({ text: items[0]?.blurb ?? '', color: UI.dim, maxWidth: w - 48 });
+    blurb.x = panel.x + 24;
+    blurb.y = panel.y + h - 56;
     c.addChild(blurb);
 
     const menu = new MenuList({
-      items, width: w - 14, rows: items.length, rowHeight: rowH,
+      items, width: w - 42, rows: items.length, rowHeight: rowH,
+      touchHeight: this.game.touchUnit,
       onSelect,
       onMove: (item) => { blurb.text = item?.blurb ?? ''; },
     });
-    menu.x = panel.x + 7;
-    menu.y = panel.y + 12;
+    menu.x = panel.x + 21;
+    menu.y = panel.y + 44;
     c.addChild(menu);
 
     this.choiceUI = { root: c, menu };

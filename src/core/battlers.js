@@ -600,9 +600,12 @@ export const BATTLER_ART = {
  * @param {*} p pen bound to the sprite cell
  * @param {string} key battler id
  */
-export function drawBattler(p, key) {
+export function drawBattler(p, key, size = null, finish = null) {
   const def = BATTLER_ART[key];
   if (!def) throw new Error(`battlers: unknown battler "${key}"`);
   const [a, b, c, d] = def.pal;
-  ARCH[def.art](p, { a, b, c, d }, def.size ?? 32);
+  ARCH[def.art](p, { a, b, c, d }, size ?? def.size ?? 32);
+  // Silhouette passes: an outline to hold the shape against a busy backdrop,
+  // a rim light matching the world's upper-left key, and contact occlusion.
+  if (finish) finish(p, { a, b, c, d });
 }

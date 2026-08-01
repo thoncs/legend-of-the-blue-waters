@@ -19,6 +19,15 @@ export const TILE = 48;
 export const ACTOR_W = 48;
 export const ACTOR_H = 72;
 export const SHIP_SIZE = 96;
+/** Battler cells are authored at 32-64px and drawn at this multiple. */
+export const BATTLER_SCALE = 3;
+
+/** Shared finishing pass so every enemy reads against a busy backdrop. */
+function finishBattler(p, pal) {
+  p.outline(PAL.shadow, { alpha: 0.7 });
+  p.rim(mix(pal.d ?? PAL.white, PAL.white, 0.45), -1, -1, 0.3);
+  p.ao(PAL.shadow, { rows: p.h * 0.18, strength: 0.35 });
+}
 
 /** The game's whole colour vocabulary. Keep additions rare so art stays cohesive. */
 export const PAL = {
@@ -245,27 +254,34 @@ const TAU = Math.PI * 2;
 function water(p, frame, ramp, { seed = 1, frames = 6, crest = null, chop = 1 } = {}) {
   const S = p.w;
   const phase = (frame / frames) * TAU;
-  p.material(ramp, { seed, lo: 1, hi: 3, cells: 3, size: S, contrast: 0.75 });
+  // Keep the mottling faint: at 48px a high-contrast noise field repeats
+  // visibly across an ocean, and the swells below are what should carry it.
+  p.fill(rampAt(ramp, 2));
+  p.material(ramp, { seed, lo: 1.6, hi: 2.6, cells: 3, size: S, contrast: 0.5 });
 
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const u = (x / S) * TAU;
       const v = (y / S) * TAU;
+      // Three swells at whole-tile frequencies: still seamless, but the beat
+      // between them is long enough to hide the tile edge.
       const a = Math.sin(u + v * 2 + phase);
       const b = Math.sin(u * 2 - v + phase * 2);
-      const n = (a + b) * 0.5 * chop;
-      if (n > 0.62) p.px(x, y, ramp[4]);
-      else if (n > 0.42) p.px(x, y, ramp[3], 0.7);
-      else if (n < -0.75) p.px(x, y, ramp[0], 0.55);
+      const c = Math.sin(u * 3 + v * 3 - phase);
+      const n = (a * 0.45 + b * 0.35 + c * 0.2) * chop;
+      if (n > 0.5) p.px(x, y, ramp[4], 0.9);
+      else if (n > 0.3) p.px(x, y, ramp[3], 0.6);
+      else if (n < -0.6) p.px(x, y, ramp[0], 0.45);
     }
   }
 
   // A couple of drifting crest dashes: enough to sparkle, not enough to boil.
   const top = crest ?? rampAt(ramp, 5);
+  const cseed = seed + p.seedShift;
   for (let i = 0; i < 3; i++) {
-    const cy = Math.floor((hash(i, seed, 3) * S + frame * (S / frames) * 2) % S);
-    const cx = Math.floor((hash(i, seed, 7) * S + frame * (S / frames) * 3) % S);
-    const len = 4 + Math.floor(hash(i, seed, 11) * 6);
+    const cy = Math.floor((hash(i, cseed, 3) * S + frame * (S / frames) * 2) % S);
+    const cx = Math.floor((hash(i, cseed, 7) * S + frame * (S / frames) * 3) % S);
+    const len = 4 + Math.floor(hash(i, cseed, 11) * 6);
     for (let k = 0; k < len; k++) {
       p.px((cx + k) % S, cy, top, 0.85);
       p.px((cx + k) % S, (cy + 1) % S, top, 0.25);
@@ -277,6 +293,23 @@ function water(p, frame, ramp, { seed = 1, frames = 6, crest = null, chop = 1 } 
 function ground(p, ramp, seed, opts = {}) {
   p.material(ramp, { seed, lo: 1, hi: 4, cells: 3, size: p.w, contrast: 0.9, ...opts });
 }
+
+/**
+ * Ground tiles that get several interchangeable cuts. A single tile repeated
+ * across a field reads as wallpaper no matter how well it is shaded; the
+ * field picks between these per position so the grid disappears.
+ */
+const TILE_VARIANTS = {
+  // Open water is the largest unbroken expanse in the game, so it needs the
+  // most cuts; each variant covers all six animation frames.
+  ...Object.fromEntries(
+    ['water', 'deep', 'shallow', 'moonsea']
+      .flatMap((b) => [0, 1, 2, 3, 4, 5].map((f) => [`${b}${f}`, 3])),
+  ),
+  grass: 4, sand: 4, sandWet: 3, dirtPath: 4, jungleFloor: 4, grassTall: 3,
+  stoneFloor: 3, ruinFloor: 3, ashGround: 3, swampGround: 3, reefSand: 3,
+  shoalSand: 3, obsidian: 3, voidFloor: 3, lavaRock: 3, ironRock: 3,
+};
 
 /** Blocks of masonry with mortar lines, offset row to row. */
 function masonry(p, ramp, { seed = 1, rows = 4, cols = 3, mortar = '#00000066' } = {}) {
@@ -1646,6 +1679,22 @@ export class Art {
     return this.tex(`battler:${key}`);
   }
 
+  /**
+   * A stable cut of a ground tile for map cell (x, y). Ground with variants
+   * stops reading as a grid; everything else just returns the one texture.
+   */
+  tileVariant(name, x, y) {
+    return this.tex(`tile:${name}${this.variantSuffix(name, x, y)}`);
+  }
+
+  /** The '~n' suffix (or '') naming this cell's cut of `name`. */
+  variantSuffix(name, x, y) {
+    const count = TILE_VARIANTS[name] ?? 1;
+    if (count < 2) return '';
+    const v = Math.floor(hash(x, y, 1337) * count) % count;
+    return v === 0 ? '' : `~${v}`;
+  }
+
   /** Native battle sprite for a party member. */
   hero(style, pose = 'idle') {
     const key = `hero:${style}:${pose}`;
@@ -1660,6 +1709,13 @@ export function buildArt() {
 
   for (const [name, draw] of Object.entries(TILE_ART)) {
     atlas.paint(`tile:${name}`, TILE, TILE, draw);
+    // Extra cuts of the same ground, differing only in their noise seed.
+    for (let v = 1; v < (TILE_VARIANTS[name] ?? 1); v++) {
+      atlas.paint(`tile:${name}~${v}`, TILE, TILE, (p) => {
+        p.seedShift = v * 977;
+        draw(p);
+      });
+    }
   }
   for (const [name, draw] of Object.entries(PROP_ART)) {
     atlas.paint(`prop:${name}`, TILE, TILE, draw);
@@ -1692,8 +1748,19 @@ export function buildArt() {
   atlas.paint('fx:splash', 48, 48, FX_ART.splash);
 
   for (const [key, def] of Object.entries(BATTLER_ART)) {
-    const size = def.size ?? 96;
-    atlas.paint(`battler:${key}`, size, size, (p) => drawBattler(p, key));
+    // The archetypes are written relative to their cell, so they scale up
+    // with the rest of the world for free.
+    const design = def.size ?? 32;
+    const size = design * BATTLER_SCALE;
+    atlas.paint(`battler:${key}`, size, size, (p) => {
+      // Archetypes are authored against a 32-64px cell and mix relative with
+      // absolute measurements, so the pen scales the shapes rather than the
+      // cell — curves get recomputed at full resolution instead of upscaled.
+      p.k = BATTLER_SCALE;
+      drawBattler(p, key, design, null);
+      p.k = 1;
+      finishBattler(p, { d: def.pal[3] });
+    });
   }
 
   const { base, pages, frames, canvases } = atlas.bake();

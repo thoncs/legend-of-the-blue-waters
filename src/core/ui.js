@@ -8,6 +8,13 @@ import { PixelText, measure, ADVANCE, LINE_H, wrapIndices, parseMarkup } from '.
 import { PAL } from './art.js';
 import { audio } from './audio.js';
 
+/**
+ * 44 CSS px is the smallest comfortable touch target; on a 648-tall stage
+ * shown on a phone that lands near 74 virtual px. Scenes that know the live
+ * `game.touchUnit` pass it explicitly; this is the safe default.
+ */
+export const TOUCH_ROW = 74;
+
 export const UI = {
   frame: 0x9fd8ff,
   frameDim: 0x3f6f92,
@@ -24,7 +31,23 @@ export const UI = {
   hpCrit: 0xff5a4a,
 };
 
-/** Paint a classic double-lined window into `g`. */
+/** Chrome thickness. Matches the 3x world so the UI reads at the same scale. */
+export const U = 3;
+
+/** Blend two 0xRRGGBB ints. */
+function mixInt(a, b, t) {
+  const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+  const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+  return (((ar + (br - ar) * t) & 255) << 16)
+    | (((ag + (bg - ag) * t) & 255) << 8)
+    | ((ab + (bb - ab) * t) & 255);
+}
+
+/**
+ * Paint a bevelled window into `g`: soft drop shadow, a body that grades from
+ * lit at the top to dark at the foot, an inner bevel lit from the upper left,
+ * a double frame and brass corner fittings.
+ */
 export function drawPanel(g, w, h, opts = {}) {
   const {
     fill = UI.fill,
@@ -33,14 +56,36 @@ export function drawPanel(g, w, h, opts = {}) {
     alpha = 0.94,
   } = opts;
   g.clear();
-  g.rect(0, 0, w, h).fill({ color: 0x000000, alpha: alpha * 0.55 });
-  g.rect(1, 1, w - 2, h - 2).fill({ color: fill, alpha });
-  g.rect(1, 1, w - 2, 1).fill({ color: UI.fillLit, alpha });
-  g.rect(0, 0, w, h).stroke({ color: frameDim, width: 1, alignment: 0 });
-  g.rect(2, 2, w - 4, h - 4).stroke({ color: frame, width: 1, alignment: 0 });
-  // Corner studs sell the "carved frame" look.
-  for (const [cx, cy] of [[2, 2], [w - 3, 2], [2, h - 3], [w - 3, h - 3]]) {
-    g.rect(cx, cy, 1, 1).fill(UI.accent);
+
+  // Drop shadow, faked as two offset rects so it reads soft without a filter.
+  g.rect(U, U * 2, w, h).fill({ color: 0x000000, alpha: 0.22 });
+  g.rect(U * 2, U * 3, w - U, h - U).fill({ color: 0x000000, alpha: 0.18 });
+
+  // Body gradient, banded (core Graphics has no gradient fill).
+  const inset = U;
+  const bands = 12;
+  const bh = (h - inset * 2) / bands;
+  for (let i = 0; i < bands; i++) {
+    const t = i / (bands - 1);
+    g.rect(inset, inset + i * bh, w - inset * 2, bh + 1)
+      .fill({ color: mixInt(UI.fillLit, fill, Math.pow(t, 0.7)), alpha });
+  }
+
+  // Inner bevel.
+  g.rect(inset, inset, w - inset * 2, U).fill({ color: 0xffffff, alpha: 0.16 });
+  g.rect(inset, inset, U, h - inset * 2).fill({ color: 0xffffff, alpha: 0.10 });
+  g.rect(inset, h - inset - U, w - inset * 2, U).fill({ color: 0x000000, alpha: 0.38 });
+  g.rect(w - inset - U, inset, U, h - inset * 2).fill({ color: 0x000000, alpha: 0.30 });
+
+  // Double frame.
+  g.rect(0, 0, w, h).stroke({ color: frameDim, width: U, alignment: 0 });
+  g.rect(U, U, w - U * 2, h - U * 2).stroke({ color: frame, width: Math.max(1, U - 1), alignment: 0 });
+
+  // Brass corner fittings.
+  const c = U * 3;
+  for (const [cx, cy] of [[0, 0], [w - c, 0], [0, h - c], [w - c, h - c]]) {
+    g.rect(cx, cy, c, c).fill({ color: UI.accent, alpha: 0.92 });
+    g.rect(cx + U, cy + U, c - U * 2, c - U * 2).fill({ color: frameDim, alpha: 0.95 });
   }
   return g;
 }
@@ -56,8 +101,8 @@ export class Panel extends Container {
     drawPanel(this.bg, w, h, opts);
     if (opts.title) {
       this.titleText = new PixelText({ text: opts.title, color: UI.accent });
-      this.titleText.x = 7;
-      this.titleText.y = 2;
+      this.titleText.x = U * 4;
+      this.titleText.y = U * 2;
       this.addChild(this.titleText);
     }
   }
@@ -71,7 +116,7 @@ export class Panel extends Container {
 
 /** Horizontal stat bar with an optional inline label. */
 export class Bar extends Container {
-  constructor(w, h = 4, color = UI.hp) {
+  constructor(w, h = 12, color = UI.hp) {
     super();
     this.w = w;
     this.h = h;
@@ -87,13 +132,20 @@ export class Bar extends Container {
     this.value = Math.max(0, Math.min(1, ratio));
     const { w, h } = this;
     const g = this.g;
+    const b = Math.max(1, Math.round(h / 6));
     g.clear();
-    g.rect(0, 0, w, h).fill(0x081018);
-    g.rect(1, 1, w - 2, h - 2).fill(0x1c3346);
-    const inner = Math.round((w - 2) * this.value);
+    // Recessed well: dark rim, shaded interior.
+    g.rect(0, 0, w, h).fill(0x050b12);
+    g.rect(b, b, w - b * 2, h - b * 2).fill(0x16293a);
+    g.rect(b, b, w - b * 2, b).fill(0x0a1622);
+    const inner = Math.round((w - b * 2) * this.value);
     if (inner > 0) {
-      g.rect(1, 1, inner, h - 2).fill(this.color);
-      g.rect(1, 1, inner, 1).fill({ color: 0xffffff, alpha: 0.35 });
+      g.rect(b, b, inner, h - b * 2).fill(this.color);
+      // Gloss along the top, shadow along the foot.
+      g.rect(b, b, inner, b).fill({ color: 0xffffff, alpha: 0.4 });
+      g.rect(b, h - b * 2, inner, b).fill({ color: 0x000000, alpha: 0.28 });
+      // A brighter leading edge so the fill has a defined end.
+      g.rect(b + inner - b, b, b, h - b * 2).fill({ color: 0xffffff, alpha: 0.22 });
     }
   }
 
@@ -111,10 +163,13 @@ export class MenuList extends Container {
     super();
     const {
       items = [],
-      width = 120,
+      width = 360,
       rows = 6,
       columns = 1,
-      rowHeight = 12,
+      // Rows are a touch target first and a text line second.
+      rowHeight = TOUCH_ROW,
+      /** Minimum tappable height, independent of how tall the row looks. */
+      touchHeight = TOUCH_ROW,
       onSelect = null,
       onCancel = null,
       onMove = null,
@@ -127,6 +182,7 @@ export class MenuList extends Container {
     this.rowsVisible = rows;
     this.columns = columns;
     this.rowHeight = rowHeight;
+    this.touchHeight = Math.max(rowHeight, touchHeight);
     this.onSelect = onSelect;
     this.onCancel = onCancel;
     this.onMove = onMove;
@@ -233,7 +289,13 @@ export class MenuList extends Container {
       const row = slot % this.rowsVisible;
       root.x = col * this.colWidth;
       root.y = row * this.rowHeight;
-      root.hitArea = { contains: (px, py) => px >= 0 && py >= 0 && px <= this.colWidth && py <= this.rowHeight };
+      // Inflate the tap box around the visual row so short rows are still
+      // reachable with a thumb; overlap is split evenly above and below.
+      const pad = Math.max(0, (this.touchHeight - this.rowHeight) / 2);
+      root.hitArea = {
+        contains: (px, py) => px >= 0 && px <= this.colWidth
+          && py >= -pad && py <= this.rowHeight + pad,
+      };
 
       label.text = item.label ?? '';
       label.x = 8;
@@ -299,37 +361,39 @@ export class MenuList extends Container {
 
 /** Scrolling, typewritten dialogue window with a speaker nameplate. */
 export class DialogueBox extends Container {
-  constructor(width = 368, lines = 3) {
+  constructor(width = 1100, lines = 3) {
     super();
     this.boxWidth = width;
     this.lineCount = lines;
-    this.height_ = lines * LINE_H + 14;
+    this.pad = U * 7;
+    this.height_ = lines * LINE_H + this.pad * 2;
 
     this.panel = new Panel(width, this.height_);
     this.addChild(this.panel);
 
-    this.namePanel = new Panel(10, 14);
-    this.namePanel.y = -13;
-    this.namePanel.x = 4;
+    const nameH = LINE_H + U * 4;
+    this.namePanel = new Panel(30, nameH);
+    this.namePanel.y = -nameH + U;
+    this.namePanel.x = U * 4;
     this.addChild(this.namePanel);
     this.nameText = new PixelText({ text: '', color: UI.accent });
-    this.nameText.x = 9;
-    this.nameText.y = -9;
+    this.nameText.x = U * 8;
+    this.nameText.y = -nameH + U * 4;
     this.addChild(this.nameText);
 
     this.body = new PixelText({
       text: '',
       color: UI.ink,
-      maxWidth: width - 16,
+      maxWidth: width - this.pad * 2,
       lineHeight: LINE_H,
     });
-    this.body.x = 8;
-    this.body.y = 7;
+    this.body.x = this.pad;
+    this.body.y = this.pad;
     this.addChild(this.body);
 
     this.more = new PixelText({ text: '▼', color: UI.accent });
-    this.more.x = width - 12;
-    this.more.y = this.height_ - 11;
+    this.more.x = width - this.pad - ADVANCE;
+    this.more.y = this.height_ - this.pad - 4;
     this.addChild(this.more);
     this.more.visible = false;
 
@@ -350,7 +414,7 @@ export class DialogueBox extends Container {
     this.nameText.visible = has;
     if (has) {
       this.nameText.text = name;
-      this.namePanel.resize(this.nameText.textWidth + 10, 14);
+      this.namePanel.resize(this.nameText.textWidth + U * 8, LINE_H + U * 4);
     }
   }
 
@@ -358,7 +422,7 @@ export class DialogueBox extends Container {
   show(text, speaker = '') {
     this.setSpeaker(speaker);
     const { plain } = parseMarkup(text);
-    const lines = wrapIndices(plain, this.boxWidth - 16);
+    const lines = wrapIndices(plain, this.boxWidth - this.pad * 2);
     // Re-slice the original (markup intact) text into page-sized chunks.
     this._pages = [];
     let chunk = [];
