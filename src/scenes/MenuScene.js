@@ -23,6 +23,7 @@ export class MenuScene extends Scene {
     const { width, height } = this.game;
 
     const shade = new Graphics();
+    shade.eventMode = 'none';
     shade.rect(0, 0, width, height).fill({ color: 0x050c14, alpha: 0.82 });
     this.addChild(shade);
 

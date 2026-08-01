@@ -61,6 +61,7 @@ export class Particles extends Container {
     this.art = art;
     this.quality = quality;
     this.budget = budget;
+    this.eventMode = 'none';
     /** @type {Array<object>} */
     this.live = [];
     this._pool = [];

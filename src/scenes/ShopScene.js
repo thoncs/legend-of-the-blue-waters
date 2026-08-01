@@ -22,6 +22,7 @@ export class ShopScene extends Scene {
     this.priceMul = priceMultiplier(state, this.shopId, this.def.priceMod ?? 1);
 
     const shade = new Graphics();
+    shade.eventMode = 'none';
     shade.rect(0, 0, width, height).fill({ color: 0x050c14, alpha: 0.85 });
     this.addChild(shade);
 

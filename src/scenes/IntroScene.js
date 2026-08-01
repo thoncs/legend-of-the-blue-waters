@@ -124,6 +124,7 @@ export class IntroScene extends Scene {
     this.crabHome = dw * 0.42;
 
     const vignette = new Graphics();
+    vignette.eventMode = 'none';
     vignette.rect(0, 0, width, height).fill({ color: 0x0a1420, alpha: 0.25 });
     this.addChild(vignette);
 

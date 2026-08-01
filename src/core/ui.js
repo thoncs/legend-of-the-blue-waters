@@ -94,6 +94,8 @@ export class Panel extends Container {
   constructor(w, h, opts = {}) {
     super();
     this.bg = new Graphics();
+    // Panel chrome is decoration; only the widgets on top of it are tappable.
+    this.bg.eventMode = 'none';
     this.addChild(this.bg);
     this.panelWidth = w;
     this.panelHeight = h;

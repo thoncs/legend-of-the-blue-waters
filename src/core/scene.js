@@ -65,6 +65,8 @@ export class SceneManager {
     this.transitioning = false;
 
     this.fade = new Graphics();
+    // Full-screen decoration: never let it intercept a tap.
+    this.fade.eventMode = 'none';
     this.fade.rect(0, 0, game.width, game.height).fill(0x000000);
     this.fade.alpha = 0;
     this.fade.visible = false;

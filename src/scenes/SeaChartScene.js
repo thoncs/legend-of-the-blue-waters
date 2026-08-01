@@ -391,6 +391,7 @@ export class SeaChartScene extends Scene {
     const { width, height, state } = this.game;
     const c = new Container();
     const shade = new Graphics();
+    shade.eventMode = 'none';
     shade.rect(0, 0, width, height).fill({ color: 0x050c14, alpha: 0.9 });
     c.addChild(shade);
 

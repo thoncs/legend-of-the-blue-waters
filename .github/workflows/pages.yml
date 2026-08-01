@@ -44,9 +44,26 @@ jobs:
       - name: Run the headless suite
         run: node tools/balance.mjs
 
+  touch:
+    name: Real touch input
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # This one does need a browser: it dispatches genuine touch events at
+      # real coordinates. It is the gate that catches "the game renders but
+      # nothing is tappable", which no amount of headless logic testing can.
+      - run: npm ci || npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/touch-real.mjs
+
   deploy:
     name: Publish
-    needs: test
+    needs: [test, touch]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

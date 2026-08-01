@@ -140,6 +140,11 @@ export class PostFX {
         this.vignette = new Sprite(game.art.tex('fx:vignette'));
         this.vignette.blendMode = 'multiply';
         this.vignette.alpha = 0.7;
+        // Decoration only. Without this the sprite covers the whole stage and
+        // swallows every hit test beneath it, which makes the entire game
+        // untappable — Pixi hit-tests a Sprite by its bounds regardless of it
+        // never emitting events itself.
+        this.vignette.eventMode = 'none';
         overlayLayer.addChildAt(this.vignette, 0);
 
         this.resize(game.width, game.height);

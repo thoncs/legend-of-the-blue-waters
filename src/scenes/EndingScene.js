@@ -63,6 +63,7 @@ export class EndingScene extends Scene {
     }
 
     this.shade = new Graphics();
+    this.shade.eventMode = 'none';
     this.shade.rect(0, 0, width, height).fill({ color: 0x080e16, alpha: 0.45 });
     this.addChild(this.shade);
 

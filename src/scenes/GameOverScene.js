@@ -15,6 +15,7 @@ export class GameOverScene extends Scene {
     const { width, height } = this.game;
 
     const bg = new Graphics();
+    bg.eventMode = 'none';
     bg.rect(0, 0, width, height).fill(0x070c14);
     bg.rect(0, height - 46, width, 46).fill(0x0d1a26);
     this.addChild(bg);

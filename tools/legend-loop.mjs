@@ -21,6 +21,21 @@ async function tap(page, action) {
   await page.evaluate((a) => window.__lotbw.input.tap(a), action);
 }
 
+/**
+ * Wait for a condition instead of sleeping a fixed amount. The game advances
+ * on frame time, so on a slow or GPU-less machine a fixed wait is not a fixed
+ * amount of game time and these checks go flaky.
+ */
+async function until(pred, budgetMS = 30000, stepMS = 200) {
+  const deadline = Date.now() + budgetMS;
+  while (Date.now() < deadline) {
+    if (await pred()) return true;
+    await page.waitForTimeout(stepMS);
+  }
+  return false;
+}
+
+
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'shots-loop');
 mkdirSync(OUT, { recursive: true });
@@ -125,8 +140,7 @@ await st(() => {
 await page.waitForTimeout(200);
 await shot('03-sea');
 await tap(page, 'confirm');
-await page.waitForTimeout(900);
-check(await scene() === 'FieldScene', 'landed');
+check(await until(async () => await scene() === 'FieldScene'), 'landed');
 check(await st(() => window.__lotbw.scenes.current.mapId) === 'moonwrack', 'landed at Moonwrack Shoals');
 await shot('04-shoals');
 
@@ -148,8 +162,9 @@ console.log('\n== boarding the galleon ==');
 await faceTile(19, 3, 'up');
 await interact();
 await talkThrough();
-await page.waitForTimeout(1600);
-check(await scene() === 'BattleScene', 'boss battle started');
+// Poll rather than sleep: the scene is built on frame time, so a fixed wait
+// only passes on fast hardware.
+check(await until(async () => await scene() === 'BattleScene'), 'boss battle started');
 await shot('06-halloway');
 
 // Put the captain on the ropes so the test finishes quickly, then mash attack.

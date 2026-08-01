@@ -143,7 +143,10 @@ export class TouchControls extends Container {
     }
 
     this._stickId = null;
-    this._origin = { x: 0, y: 0 };
+    // NOT `_origin`: Pixi's Container uses that name internally for its
+    // transform origin, and overwriting it corrupts the world transform —
+    // which silently zeroes the bounds of every control in here.
+    this._stickOrigin = { x: 0, y: 0 };
     this._vec = { x: 0, y: 0 };
     this._fade = 0;
 
@@ -240,8 +243,8 @@ export class TouchControls extends Container {
     if (!cfg.stick || this._stickId !== null) return;
     this._stickId = e.pointerId;
     const p = e.getLocalPosition(this);
-    this._origin.x = p.x;
-    this._origin.y = p.y;
+    this._stickOrigin.x = p.x;
+    this._stickOrigin.y = p.y;
     this._vec.x = 0;
     this._vec.y = 0;
     this.stickG.visible = true;
@@ -253,13 +256,13 @@ export class TouchControls extends Container {
     if (this._stickId === null || e.pointerId !== this._stickId) return;
     const p = e.getLocalPosition(this);
     const radius = this.game.touchUnit * 1.45;
-    let dx = p.x - this._origin.x;
-    let dy = p.y - this._origin.y;
+    let dx = p.x - this._stickOrigin.x;
+    let dy = p.y - this._stickOrigin.y;
     const mag = Math.hypot(dx, dy);
     if (mag > radius) {
       // Drag the origin along so the stick never runs out of travel.
-      this._origin.x = p.x - (dx / mag) * radius;
-      this._origin.y = p.y - (dy / mag) * radius;
+      this._stickOrigin.x = p.x - (dx / mag) * radius;
+      this._stickOrigin.y = p.y - (dy / mag) * radius;
       dx = (dx / mag) * radius;
       dy = (dy / mag) * radius;
     }
@@ -286,8 +289,8 @@ export class TouchControls extends Container {
   _drawStick() {
     const g = this.stickG;
     const radius = this.game.touchUnit * 1.45;
-    const ox = this._origin.x;
-    const oy = this._origin.y;
+    const ox = this._stickOrigin.x;
+    const oy = this._stickOrigin.y;
     const kx = ox + this._vec.x * radius;
     const ky = oy + this._vec.y * radius;
     const mag = Math.hypot(this._vec.x, this._vec.y);

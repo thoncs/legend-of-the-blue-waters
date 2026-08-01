@@ -22,6 +22,8 @@ export class LightLayer extends Container {
     this.art = art;
     this.quality = quality;
     this.blendMode = 'add';
+    // Purely decorative, and it sits above the world — must not eat taps.
+    this.eventMode = 'none';
     /** @type {Array<{x:number,y:number,r:number,color:number,alpha:number,flicker:number,phase:number,sprite:Sprite}>} */
     this.lights = [];
     this._pool = [];

@@ -146,6 +146,7 @@ export class FieldScene extends Scene {
     this.setupWeather();
 
     this.tintLayer = new Graphics();
+    this.tintLayer.eventMode = 'none';
     this.tintLayer.rect(0, 0, width, height).fill(0xffffff);
     this.tintLayer.blendMode = 'multiply';
     this.addChild(this.tintLayer);
@@ -158,6 +159,7 @@ export class FieldScene extends Scene {
     this.buildLights();
 
     this.flashLayer = new Graphics();
+    this.flashLayer.eventMode = 'none';
     this.flashLayer.rect(0, 0, width, height).fill(0xffffff);
     this.flashLayer.alpha = 0;
     this.addChild(this.flashLayer);

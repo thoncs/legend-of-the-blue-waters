@@ -38,6 +38,7 @@ specifier, so the extension carries no meaning here.
 npm install            # only needed for the browser-driven scripts (playwright)
 npm test               # headless logic + battle-balance report — no browser required
 npm run bootcheck      # boots on a landscape phone viewport, reports any console error
+npm run touch          # real touch events on an iPhone viewport, end to end
 npm run mobile         # touch-driven sweep on a phone viewport, audits touch targets
 npm run smoke          # boots the game, plays the opening, screenshots it
 npm run sweep          # visits every scene and screenshots it, fails on console errors
@@ -85,6 +86,12 @@ the sun is up and to the left.
   subclasses attached to `app.stage`, a single `app.ticker.add((ticker) => …)` driving
   every update from `ticker.deltaMS`, `eventMode: 'static'` on everything tappable, and
   `Texture` sub-frames off one shared `TextureSource`.
+- **Two input test layers.** `npm run mobile` drives `input.tap()`, which is
+  fast but only covers the action layer. `npm run touch` dispatches real touch
+  events at real coordinates, covering Pixi's event system, hit areas and
+  control schemes — the layer where a decorative full-screen sprite, or a
+  field name that collides with one of Pixi's internals, can make the entire
+  game silently untappable while still rendering perfectly.
 - **Touch, all the way down.** `core/input.js` has no keyboard listeners at all: it
   exposes named actions fed by `setVirtual` / `setStick` / `tap`, which the on-screen
   controls and the headless test tools both drive. Touch targets are sized from
