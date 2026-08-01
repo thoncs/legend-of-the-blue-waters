@@ -1624,6 +1624,23 @@ const FX_ART = {
       }
     }
   },
+  /**
+   * Screen vignette, drawn opaque and composited with multiply: white in the
+   * middle leaves the frame alone, the darkened rim pulls the corners down.
+   */
+  vignette: (p) => {
+    const S = p.w;
+    const r = S / 2;
+    const edge = '#5c6a86';
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const d = Math.min(1, Math.hypot(x - r + 0.5, y - r + 0.5) / r);
+        // Flat through the middle, then a smooth roll-off to the corners.
+        const t = Math.max(0, (d - 0.52) / 0.48);
+        p.px(x, y, mix(PAL.white, edge, t * t));
+      }
+    }
+  },
   spark: (p) => {
     const S = p.w;
     p.ellipse(S / 2, S / 2, S * 0.18, S * 0.18, PAL.white);
@@ -1744,6 +1761,7 @@ export function buildArt() {
   atlas.paint('fx:waveEdge', 48, 12, FX_ART.waveEdge);
   atlas.paint('fx:light', 128, 128, FX_ART.light);
   atlas.paint('fx:spark', 16, 16, FX_ART.spark);
+  atlas.paint('fx:vignette', 192, 192, FX_ART.vignette);
   atlas.paint('fx:smoke', 48, 48, FX_ART.smoke);
   atlas.paint('fx:splash', 48, 48, FX_ART.splash);
 

@@ -17,6 +17,7 @@ import { SceneManager } from './core/scene.js';
 import { audio } from './core/audio.js';
 import { loadOptions, saveOptions } from './core/save.js';
 import { quality } from './core/quality.js';
+import { PostFX } from './core/postfx.js';
 import { GameState } from './systems/gamestate.js';
 import { TitleScene } from './scenes/TitleScene.js';
 
@@ -137,6 +138,8 @@ export async function boot({ host, onProgress = () => {} } = {}) {
   app.stage.sortableChildren = false;
 
   game.scenes = new SceneManager(app, game);
+  // Bloom/grade wrap the world only; the touch controls sit above it, crisp.
+  game.postfx = new PostFX(game, game.scenes.root, game.scenes.fxRoot);
   game.touch = new TouchControls(game);
   game.scenes.fxRoot.addChild(game.touch);
 
@@ -171,6 +174,7 @@ export async function boot({ host, onProgress = () => {} } = {}) {
 
     game.scenes.resize(vp.vw, vp.vh);
     game.touch.resize(vp.vw, vp.vh);
+    game.postfx.resize(vp.vw, vp.vh);
   };
 
   fit();
@@ -178,14 +182,19 @@ export async function boot({ host, onProgress = () => {} } = {}) {
   window.addEventListener('orientationchange', fit);
   window.visualViewport?.addEventListener('resize', fit);
 
-  // Re-fit when the renderer's own resolution budget changes.
-  quality.onRenderScaleChange(fit);
+  // Re-fit when the renderer's own resolution budget changes, and re-tune the
+  // effect stack with it.
+  quality.onRenderScaleChange(() => {
+    fit();
+    game.postfx.refresh();
+  });
 
   // --- main loop ----------------------------------------------------
   app.ticker.add((ticker) => {
     // Cap the step so a backgrounded tab cannot teleport the player.
     const dtMS = Math.min(ticker.deltaMS, 50);
     quality.sample(ticker.deltaMS);
+    game.postfx.apply();
     input.beginFrame(dtMS);
     game.touch.update(dtMS);
     game.scenes.update(dtMS);

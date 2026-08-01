@@ -60,9 +60,17 @@ const shot = async (name) => {
   console.log(`  ${name}  <- ${await sceneName()}`);
 };
 
-/** Wait until the named scene is on top, driving `action` until it arrives. */
-async function until(name, action = 'confirm', tries = 40) {
-  for (let i = 0; i < tries; i++) {
+/**
+ * Wait until the named scene is on top, driving `action` until it arrives.
+ *
+ * Bounded by wall-clock rather than a tap count: the game advances on frame
+ * time, so on a slow or GPU-less machine a fixed number of taps is not a
+ * fixed amount of game time, and the test would fail for being patient
+ * enough only on fast hardware.
+ */
+async function until(name, action = 'confirm', budgetMS = 45000) {
+  const deadline = Date.now() + budgetMS;
+  while (Date.now() < deadline) {
     if (await sceneName() === name) return true;
     await tap(action);
   }
@@ -81,18 +89,16 @@ if (!await until('BattleScene')) errors.push('never reached BattleScene');
 await shot('03-battle');
 
 // Fight it out; the tutorial battle is unloseable.
-for (let i = 0; i < 90; i++) {
-  if (await sceneName() === 'FieldScene') break;
-  await tap('confirm');
+if (!await until('FieldScene', 'confirm', 120000)) {
+  errors.push('battle never resolved into FieldScene');
 }
-if (await sceneName() !== 'FieldScene') errors.push('battle never resolved into FieldScene');
 await shot('04-field');
 
 // Clear the opening notice before anything else; the field swallows the log
 // button while a conversation is up.
-for (let i = 0; i < 12; i++) {
-  const talking = await page.evaluate(() => !!window.__lotbw.scenes.current?.talking);
-  if (!talking) break;
+const talkDeadline = Date.now() + 30000;
+while (Date.now() < talkDeadline) {
+  if (!await page.evaluate(() => !!window.__lotbw.scenes.current?.talking)) break;
   await tap('confirm');
 }
 
@@ -107,7 +113,7 @@ await shot('05-field-walk');
 await tap('menu');
 const opened = await page
   .waitForFunction(() => window.__lotbw.scenes.current?.constructor?.name === 'MenuScene',
-    null, { timeout: 5000 })
+    null, { timeout: 15000 })
   .then(() => true, () => false);
 if (!opened) errors.push('log did not open');
 await shot('06-menu');
@@ -124,7 +130,12 @@ const audit = await page.evaluate(() => {
   }
   return { scale, buttons: out, touchUnit: g.touchUnit, unitCss: g.touchUnit * scale };
 });
-console.log('\ntouch targets:', JSON.stringify(audit, null, 2));
+const perf = await page.evaluate(() => ({
+  fps: window.__lotbw.quality.fps(),
+  tier: window.__lotbw.quality.tier,
+}));
+console.log(`\nframe rate: ${perf.fps} fps at tier "${perf.tier}"`);
+console.log('touch targets:', JSON.stringify(audit, null, 2));
 for (const b of audit.buttons) {
   if (b.cssDiameter < 44) errors.push(`touch target "${b.action}" is ${b.cssDiameter.toFixed(1)} CSS px, under 44`);
 }

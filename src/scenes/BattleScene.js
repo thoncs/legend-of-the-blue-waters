@@ -4,7 +4,7 @@
  * The scene owns presentation only: it pumps the engine in systems/battle.js,
  * animates whatever events come back, and hands input decisions in.
  */
-import { Container, Graphics, Sprite } from 'pixi.js';
+import { BlurFilter, Container, Graphics, Sprite } from 'pixi.js';
 import { Scene } from '../core/scene.js';
 import { PixelText, measure } from '../core/font.js';
 import { Panel, MenuList, Bar, UI, Popup } from '../core/ui.js';
@@ -132,25 +132,31 @@ export class BattleScene extends Scene {
     g.rect(0, 0, dw, 36).fill(def.sky[0]);
     g.rect(0, 36, dw, 34).fill(def.sky[1]);
     g.rect(0, 70, dw, horizon - 70).fill(def.sky[2]);
-    g.rect(0, horizon, dw, 216 - horizon).fill(def.ground);
-    // Dithered band where ground meets sky, so the seam reads as depth.
+    // Each band is laid down once — the ground used to be filled twice over,
+    // which is a full extra screen of fill on a device without a real GPU.
+    g.rect(0, horizon, dw, 10).fill(def.ground);
+    g.rect(0, horizon + 10, dw, 216 - horizon - 10).fill(def.groundLit);
+    // Dithered seam where ground meets sky, so it reads as depth rather than
+    // a hard line. Two-pixel runs on a four-pixel pitch: a quarter of the
+    // geometry of a per-pixel checker, and indistinguishable once scaled 3x.
     for (let y = 0; y < 10; y++) {
-      for (let x = (y % 2); x < dw; x += 2) {
-        g.rect(x, horizon + y, 1, 1).fill({ color: def.groundLit, alpha: 1 - y / 12 });
+      const alpha = 1 - y / 12;
+      for (let x = (y % 2) * 2; x < dw; x += 4) {
+        g.rect(x, horizon + y, 2, 1).fill({ color: def.groundLit, alpha });
       }
     }
-    g.rect(0, horizon + 10, dw, 216 - horizon - 10).fill(def.groundLit);
     // Scatter over the ground so the lower half is not a flat slab of colour.
-    for (let i = 0; i < 320; i++) {
+    for (let i = 0; i < 200; i++) {
       const x = Math.floor(rng() * dw);
       const depth = rng();
       const y = horizon + 8 + Math.floor(depth * depth * (216 - horizon - 8));
-      const w = 1 + Math.floor(rng() * 2);
+      const w = 1 + Math.floor(rng() * 3);
       g.rect(x, y, w, 1).fill({ color: rng() < 0.5 ? def.ground : def.silhouette, alpha: 0.18 + rng() * 0.3 });
     }
-    // A darker apron at the very bottom keeps the UI panels legible.
-    for (let y = 0; y < 22; y++) {
-      g.rect(0, 216 - 22 + y, dw, 1).fill({ color: def.silhouette, alpha: (y / 22) * 0.5 });
+    // A darker apron at the very bottom keeps the UI panels legible. Six
+    // bands read the same as twenty-two once this is scaled up.
+    for (let y = 0; y < 6; y++) {
+      g.rect(0, 216 - 22 + y * 4, dw, 4).fill({ color: def.silhouette, alpha: (y / 6) * 0.5 });
     }
     design.addChild(g);
 
@@ -204,6 +210,12 @@ export class BattleScene extends Scene {
     }
     // The motifs are drawn against a 96px horizon; nudge them onto the real one.
     sil.y = 8;
+    // Depth of field: the parallax layer sits behind the fighters, so softening
+    // it pushes the diorama apart and keeps the eye on the combatants. Set from
+    // the tier at build time — a mid-battle downgrade takes effect next fight.
+    if (this.game.quality.depthBlur) {
+      sil.filters = [new BlurFilter({ strength: 5, quality: 3 })];
+    }
     design.addChild(sil);
     this.silhouette = sil;
     this.backdropDesign = design;

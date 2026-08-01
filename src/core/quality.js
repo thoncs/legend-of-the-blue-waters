@@ -123,10 +123,12 @@ class Quality {
   /** Called every frame with the raw (unclamped) frame time. */
   sample(deltaMS) {
     this._elapsed += deltaMS;
-    if (this._elapsed < WARMUP_MS || this.mode !== 'auto') return;
 
-    // Rolling average; ignore single huge stalls (GC, tab switch).
+    // Always track the average, even on a pinned tier: the options readout
+    // and any diagnostics need a real number, not the value it booted with.
     if (deltaMS < 200) this._avgFrame += (deltaMS - this._avgFrame) * 0.05;
+
+    if (this._elapsed < WARMUP_MS || this.mode !== 'auto') return;
 
     if (this._avgFrame > BAD_FRAME_MS) {
       this._badFor += deltaMS;

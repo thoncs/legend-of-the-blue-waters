@@ -93,6 +93,10 @@ the sun is up and to the left.
 - **Effects scale to the device.** `core/quality.js` watches the frame time and steps
   bloom, depth blur and particle density down a tier when it stays bad, and never
   oscillates back up on its own. The options tab can pin a tier.
+- **One post pass.** `core/postfx.js` is a custom GLSL filter doing bright-pass bloom,
+  colour grade and split-tone in a single 17-tap gather, wrapped around the scene root
+  so the on-screen controls stay crisp above it. The threshold sits above diffuse
+  surfaces, so lit sand does not glow but the moon, foam, flame and light pools do.
 - **One atlas.** All tiles, characters, ships, props, effects and battlers are painted
   into a single offscreen canvas at boot and sliced into sub-textures, so the whole world
   batches into very few draw calls.
@@ -145,6 +149,7 @@ src/core/
   font.js                  hand-authored 8x14 bitmap font, word wrap, typewriter text
   paint.js                 colour ramps, seamless noise, the pixel-buffer drawing surface
   art.js                   palette, tile/prop/character/ship/effect art, atlas builder
+  postfx.js                bloom + colour grade in one custom GLSL pass
   lighting.js              additive light pools over the night darkness
   particles.js             pooled emitter: embers, spray, dust, sparks
   quality.js               frame-time driven effect tiers
@@ -237,6 +242,8 @@ and the Wailing Pass needs four legends and a refit.
 - **Some screens got a mechanical rescale.** The shop, sea chart, ending and game-over
   screens were scaled to the new stage and verified free of errors, but they have not
   had the hand-tuning the title, field, battle, log and intro screens received.
+- **Depth blur is set per battle.** The parallax blur is chosen from the quality tier
+  when the backdrop is built, so a mid-fight downgrade takes effect on the next fight.
 - **Field encounters are step-based**, not visible-on-map monsters, so they cannot be
   avoided except by resolving the region's legend (which does turn them off).
 - **Reputation is shallow.** It shifts shop prices and a few lines; it does not gate
@@ -247,12 +254,9 @@ and the Wailing Pass needs four legends and a refit.
 
 ## Next expansion ideas
 
-1. **Full-screen bloom.** `core/lighting.js` already gives additive light pools and
-   `core/quality.js` already gates a `bloom` tier; what is missing is the bright-pass
-   and blur composite over the whole frame.
-2. **Visible field encounters.** Wandering enemy sprites with aggro ranges, so avoidance
+1. **Visible field encounters.** Wandering enemy sprites with aggro ranges, so avoidance
    becomes a skill; the existing `encounters` tables already describe the roster.
-3. **Town interiors.** The map compiler and warp system already support them — a tavern,
+2. **Town interiors.** The map compiler and warp system already support them — a tavern,
    a chapel and a forge would each be a 20-line ASCII sketch.
 3. **Ship upgrades as systems, not just visuals.** Hull, sail and guns that change sea
    speed, encounter rates and open new lanes; `state.ship.tier` and the three ship
