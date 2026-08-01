@@ -14,6 +14,16 @@ import { mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * The game is touch-only, so the tools drive it through the same virtual
+ * action hook the on-screen controls use rather than through a keyboard that
+ * no longer exists.
+ */
+async function tap(page, action) {
+  await page.evaluate((a) => window.__lotbw.input.tap(a), action);
+}
+
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SHOTS = join(HERE, 'shots');
 const BASE = process.env.SMOKE_URL ?? 'http://localhost:8080/';
@@ -51,7 +61,7 @@ async function main() {
   };
   const key = async (k, times = 1, delay = 240) => {
     for (let i = 0; i < times; i++) {
-      await page.keyboard.press(k);
+      await tap(page, k);
       await page.waitForTimeout(delay);
     }
   };
@@ -67,17 +77,17 @@ async function main() {
   await shot('01-title');
 
   console.log('new game + intro');
-  await page.keyboard.press('KeyZ');
+  await tap(page, 'confirm');
   await page.waitForTimeout(900);
   await shot('02-intro');
-  await key('KeyZ', 10, 320);
+  await key('confirm', 10, 320);
   await shot('03-first-battle');
 
   console.log(`scene: ${await scene()}`);
 
   // Fight through the tutorial battle: attack, attack, attack…
   for (let i = 0; i < 40; i++) {
-    await page.keyboard.press('KeyZ');
+    await tap(page, 'confirm');
     await page.waitForTimeout(240);
     const s = await scene();
     if (s === 'FieldScene') break;
@@ -87,24 +97,24 @@ async function main() {
   console.log(`scene: ${await scene()}`);
 
   console.log('walking and talking');
-  await key('ArrowLeft', 2, 200);
-  await key('ArrowDown', 1, 200);
-  await page.keyboard.press('KeyZ');
+  await key('left', 2, 200);
+  await key('down', 1, 200);
+  await tap(page, 'confirm');
   await page.waitForTimeout(400);
   await shot('05-dialogue');
-  await key('KeyZ', 8, 260);
+  await key('confirm', 8, 260);
 
   console.log('menus');
-  await page.keyboard.press('KeyC');
+  await tap(page, 'menu');
   await page.waitForTimeout(600);
   await shot('06-menu-crew');
-  await page.keyboard.press('ArrowRight');
+  await tap(page, 'right');
   await page.waitForTimeout(300);
   await shot('07-menu-gear');
-  await page.keyboard.press('KeyQ');
+  await tap(page, 'journal');
   await page.waitForTimeout(400);
   await shot('08-journal');
-  await page.keyboard.press('KeyX');
+  await tap(page, 'cancel');
   await page.waitForTimeout(500);
 
   console.log('putting to sea');
@@ -112,12 +122,12 @@ async function main() {
     const g = window.__lotbw;
     g.state.position = { map: 'marrowport', x: 16, y: 17, dir: 'down' };
   });
-  await key('ArrowDown', 6, 200);
+  await key('down', 6, 200);
   await page.waitForTimeout(900);
   const s2 = await scene();
   console.log(`scene: ${s2}`);
   await shot('09-sea-or-port');
-  await page.keyboard.press('KeyM');
+  await tap(page, 'chart');
   await page.waitForTimeout(500);
   await shot('10-chart');
 

@@ -12,6 +12,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveExecutable, BASE } from './browser.mjs';
 
+/**
+ * The game is touch-only, so the tools drive it through the same virtual
+ * action hook the on-screen controls use rather than through a keyboard that
+ * no longer exists.
+ */
+async function tap(page, action) {
+  await page.evaluate((a) => window.__lotbw.input.tap(a), action);
+}
+
+
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'shots-loop');
 mkdirSync(OUT, { recursive: true });
 
@@ -48,7 +58,7 @@ const talkThrough = async (max = 40) => {
   for (let i = 0; i < max; i++) {
     const talking = await page.evaluate(() => Boolean(window.__lotbw.scenes.current?.talking));
     if (!talking) return;
-    await page.keyboard.press('KeyZ');
+    await tap(page, 'confirm');
     await page.waitForTimeout(170);
   }
 };
@@ -91,8 +101,8 @@ await faceTile(25, 13, 'right');
 await interact();
 await talkThrough();
 // The rest menu is a choice overlay: pick "Wait for nightfall".
-await page.keyboard.press('ArrowDown'); await page.waitForTimeout(180);
-await page.keyboard.press('KeyZ'); await page.waitForTimeout(320);
+await tap(page, 'down'); await page.waitForTimeout(180);
+await tap(page, 'confirm'); await page.waitForTimeout(320);
 await talkThrough();
 check(await st(() => window.__lotbw.state.isNight), 'resting to nightfall works');
 await shot('02-night');
@@ -114,7 +124,7 @@ await st(() => {
 });
 await page.waitForTimeout(200);
 await shot('03-sea');
-await page.keyboard.press('KeyZ');
+await tap(page, 'confirm');
 await page.waitForTimeout(900);
 check(await scene() === 'FieldScene', 'landed');
 check(await st(() => window.__lotbw.scenes.current.mapId) === 'moonwrack', 'landed at Moonwrack Shoals');
@@ -149,7 +159,7 @@ await st(() => {
   for (const e of b.enemies) { e.hp = 60; e.guard = 1; }
 });
 for (let i = 0; i < 150; i++) {
-  await page.keyboard.press('KeyZ');
+  await tap(page, 'confirm');
   await page.waitForTimeout(110);
   if (await scene() !== 'BattleScene') break;
 }

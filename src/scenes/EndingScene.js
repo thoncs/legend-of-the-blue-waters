@@ -9,6 +9,7 @@ import { Panel, MenuList, UI, Blinker } from '../core/ui.js';
 import { input } from '../core/input.js';
 import { audio } from '../core/audio.js';
 import { rng } from '../core/rng.js';
+import { TILE } from '../core/art.js';
 import { endingSummary } from '../systems/worldstate.js';
 import { saveGame } from '../core/save.js';
 
@@ -18,27 +19,27 @@ export class EndingScene extends Scene {
     const { width, height, art, state } = this.game;
 
     const sky = new Graphics();
-    sky.rect(0, 0, width, 30).fill(0x1a2c4a);
-    sky.rect(0, 30, width, 22).fill(0x395a7a);
-    sky.rect(0, 52, width, 18).fill(0x7a8fa0);
-    sky.rect(0, 70, width, 14).fill(0xd8a878);
-    sky.rect(0, 84, width, 12).fill(0xe8c890);
+    sky.rect(0, 0, width, 90).fill(0x1a2c4a);
+    sky.rect(0, 90, width, 66).fill(0x395a7a);
+    sky.rect(0, 156, width, 54).fill(0x7a8fa0);
+    sky.rect(0, 210, width, 42).fill(0xd8a878);
+    sky.rect(0, 252, width, 36).fill(0xe8c890);
     this.addChild(sky);
 
     const sun = new Graphics();
-    sun.circle(300, 92, 18).fill({ color: 0xffd08a, alpha: 0.25 });
-    sun.circle(300, 92, 12).fill(0xffe0a0);
+    sun.circle(width * 0.78, 276, 54).fill({ color: 0xffd08a, alpha: 0.25 });
+    sun.circle(width * 0.78, 276, 36).fill(0xffe0a0);
     this.addChild(sun);
 
     this.sea = new Container();
-    this.sea.y = 96;
+    this.sea.y = 864;
     this.addChild(this.sea);
     this.waterSprites = [];
     for (let row = 0; row < 7; row++) {
-      for (let col = 0; col < width / 16 + 1; col++) {
+      for (let col = 0; col < width / TILE + 1; col++) {
         const s = new Sprite(art.tex('tile:water0'));
-        s.x = col * 16;
-        s.y = row * 16;
+        s.x = col * TILE;
+        s.y = row * TILE;
         s.tint = row < 2 ? 0xc8b090 : 0xffffff;
         this.sea.addChild(s);
         this.waterSprites.push(s);
@@ -46,9 +47,9 @@ export class EndingScene extends Scene {
     }
 
     this.ship = new Sprite(art.ship(2, 'right'));
-    this.ship.scale.set(2);
+    this.ship.scale.set(1.4);
     this.ship.x = 60;
-    this.ship.y = 76;
+    this.ship.y = 228;
     this.addChild(this.ship);
 
     this.birds = [];
@@ -65,23 +66,23 @@ export class EndingScene extends Scene {
     this.shade.rect(0, 0, width, height).fill({ color: 0x080e16, alpha: 0.45 });
     this.addChild(this.shade);
 
-    this.panel = new Panel(width - 28, 84);
-    this.panel.x = 14;
-    this.panel.y = 116;
+    this.panel = new Panel(width - 84, 252);
+    this.panel.x = 42;
+    this.panel.y = 348;
     this.addChild(this.panel);
 
     this.head = new PixelText({ text: '', color: UI.accent });
-    this.head.x = 22;
-    this.head.y = 122;
+    this.head.x = 66;
+    this.head.y = 366;
     this.addChild(this.head);
 
-    this.body = new PixelText({ text: '', color: UI.ink, maxWidth: width - 44 });
-    this.body.x = 22;
-    this.body.y = 136;
+    this.body = new PixelText({ text: '', color: UI.ink, maxWidth: width - 132 });
+    this.body.x = 66;
+    this.body.y = 408;
     this.addChild(this.body);
 
-    this.prompt = new Blinker('press Z', UI.dim);
-    this.prompt.x = width - 22 - measure('press Z');
+    this.prompt = new Blinker('tap to go on', UI.dim);
+    this.prompt.x = width - 66 - measure('tap to go on');
     this.prompt.y = height - 14;
     this.addChild(this.prompt);
 
@@ -179,11 +180,12 @@ export class EndingScene extends Scene {
       { label: 'Return to the title', value: 'title' },
     ];
     this.menu = new MenuList({
-      items, width: width - 60, rows: 2, rowHeight: 12,
+      items, width: width - 180, rows: 2, rowHeight: this.game.touchUnit,
+      touchHeight: this.game.touchUnit,
       onSelect: (item) => this.choose(item.value),
     });
-    this.menu.x = 30;
-    this.menu.y = height - 44;
+    this.menu.x = 90;
+    this.menu.y = height - this.game.touchUnit * 2 - 36;
     this.addChild(this.menu);
     void height;
   }
@@ -215,7 +217,7 @@ export class EndingScene extends Scene {
     }
     this.ship.x += dtMS * 0.008;
     if (this.ship.x > this.game.width + 20) this.ship.x = -30;
-    this.ship.y = 76 + Math.round(Math.sin(this.t / 700) * 2);
+    this.ship.y = 228 + Math.round(Math.sin(this.t / 700) * 2);
 
     for (const bird of this.birds) {
       bird.b.x += bird.vx * dtMS / 1000;

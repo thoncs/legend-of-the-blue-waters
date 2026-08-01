@@ -22,6 +22,8 @@ import {
 } from '../systems/worldstate.js';
 import { saveGame } from '../core/save.js';
 import { TILE, ACTOR_FRAMES } from '../core/art.js';
+import { LightLayer } from '../core/lighting.js';
+import { Particles } from '../core/particles.js';
 
 const STEP_MS = 148;
 const RUN_MS = 92;
@@ -90,6 +92,9 @@ export class FieldScene extends Scene {
     this.animFrame = 0;
 
     // --- props ---
+    this.particles = new Particles(art, this.game.quality);
+    this.world.addChild(this.particles);
+
     this.propSprites = new Map();
     for (const obj of this.map.objects) {
       const s = new Sprite(art.tex(`prop:${this.propTexture(obj)}`));
@@ -145,6 +150,12 @@ export class FieldScene extends Scene {
     this.tintLayer.blendMode = 'multiply';
     this.addChild(this.tintLayer);
     this.applyTint();
+
+    // Additive light pools, above the multiply darkness so a lit brazier
+    // punches a warm hole in the night instead of just being a paler pixel.
+    this.lights = new LightLayer(art, this.game.quality);
+    this.addChild(this.lights);
+    this.buildLights();
 
     this.flashLayer = new Graphics();
     this.flashLayer.rect(0, 0, width, height).fill(0xffffff);
@@ -292,10 +303,43 @@ export class FieldScene extends Scene {
     return { x, y };
   }
 
+  buildLights() {
+    this.lights.clear();
+    // Anything currently showing a lit texture casts light.
+    const cast = {
+      brazierLit: { radius: 200, color: 0xff9a3c, alpha: 0.95, flicker: 1 },
+      beaconLit: { radius: 300, color: 0xffd45e, alpha: 1, flicker: 0.35 },
+      lantern: { radius: 150, color: 0xffc46a, alpha: 0.85, flicker: 0.5 },
+      fire: { radius: 210, color: 0xff7a2b, alpha: 0.95, flicker: 1 },
+      shrine: { radius: 160, color: 0x9fd8ff, alpha: 0.6, flicker: 0.2 },
+      relic: { radius: 140, color: 0xffd45e, alpha: 0.7, flicker: 0.15 },
+      pearl: { radius: 120, color: 0xcdeff0, alpha: 0.55, flicker: 0.1 },
+    };
+    for (const obj of this.map.objects) {
+      const def = cast[this.propTexture(obj)];
+      if (!def) continue;
+      this.lights.add({
+        x: obj.x * TILE + TILE / 2,
+        y: obj.y * TILE + TILE / 2,
+        ...def,
+      });
+    }
+    // The crew's own lamp, so the player is never standing in a black hole.
+    this.playerLight = this.lights.add({
+      x: 0, y: 0, radius: 230, color: 0xffcf9a, alpha: 0.5, flicker: 0.25,
+    });
+  }
+
   applyTint() {
     const color = ambientTint(this.game.state, this.map);
     this.tintLayer.tint = color;
     this.tintLayer.visible = color !== 0xffffff;
+    // Lights come up exactly as far as the world goes down.
+    const r = (color >> 16) & 255;
+    const g = (color >> 8) & 255;
+    const b = color & 255;
+    const lum = (r * 0.3 + g * 0.5 + b * 0.2) / 255;
+    if (this.lights) this.lights.intensity = Math.max(0, Math.min(1, (1 - lum) * 1.5));
   }
 
   setupWeather() {
@@ -1166,6 +1210,23 @@ export class FieldScene extends Scene {
     // The view must keep up even while a window or a conversation is open.
     this.updateCamera();
     this.refreshTiles();
+
+    // Lights are placed in world space but drawn above the screen-space
+    // darkness, so they take the camera offset by hand.
+    if (this.playerLight) {
+      this.playerLight.x = this.playerSprite.x + TILE / 2;
+      this.playerLight.y = this.playerSprite.y + TILE;
+    }
+    this.lights.update(dtMS, this.camX, this.camY, this.game.width, this.game.height);
+
+    // Embers off anything burning, and a few motes in the air.
+    this.particles.update(dtMS);
+    if (this.game.quality.particles > 0) {
+      for (const l of this.lights.lights) {
+        if (l.flicker < 0.9) continue;
+        this.particles.stream('ember', l.x, l.y - 6, 5, dtMS, { spreadX: 14 });
+      }
+    }
 
     if (this.choiceUI) {
       this.choiceUI.menu.update(dtMS);

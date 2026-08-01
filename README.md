@@ -1,7 +1,10 @@
 # Legend of the Blue Waters
 
-A complete, playable pirate-Caribbean JRPG for the browser: 8-bit top-down exploration,
+A complete, playable pirate-Caribbean JRPG for the browser: top-down exploration,
 classic turn-based battles, and six regional legends that drive the whole game.
+
+Built for a **phone, held sideways, driven entirely by touch** — there is no keyboard
+support, by design.
 
 Built with **PixiJS 8**, plain ES modules, and **no build step**. Every tile, character,
 enemy, sound effect and music track is generated in code at boot — there is not a single
@@ -31,6 +34,8 @@ mapped through an import map in `index.html`, so the game also runs fully offlin
 ```bash
 npm install            # only needed for the browser-driven scripts (playwright)
 npm test               # headless logic + battle-balance report — no browser required
+npm run bootcheck      # boots on a landscape phone viewport, reports any console error
+npm run mobile         # touch-driven sweep on a phone viewport, audits touch targets
 npm run smoke          # boots the game, plays the opening, screenshots it
 npm run sweep          # visits every scene and screenshots it, fails on console errors
 npm run loop           # plays the first legend end to end and asserts the world changed
@@ -64,14 +69,30 @@ large and half-finished.
 
 ## How it is built
 
-Everything renders at a fixed **384×216** virtual resolution, integer-scaled with CSS so
-the pixel art always lands on whole pixels.
+The stage is a fixed **648 px tall**; its width comes from the device's aspect ratio
+(clamped to 1152–1728), so a phone fills edge to edge instead of letterboxing a 16:9 box
+into a ~2.16:1 screen. The renderer draws at the device's real pixel density, so the art
+is upscaled once on the GPU rather than squeezed through a fractional CSS downscale.
+
+Tiles are **48 px** and characters **48×72**, shaded off six-stop colour ramps with
+dithered transitions, ambient occlusion at contact points, and a rim light that assumes
+the sun is up and to the left.
 
 - **PixiJS patterns.** `new Application()` + `await app.init(...)`, scenes as `Container`
   subclasses attached to `app.stage`, a single `app.ticker.add((ticker) => …)` driving
-  every update from `ticker.deltaMS`, `eventMode: 'static'` on menu rows so every menu is
-  clickable as well as keyboard-driven, and `Texture` sub-frames off one shared
-  `TextureSource`.
+  every update from `ticker.deltaMS`, `eventMode: 'static'` on everything tappable, and
+  `Texture` sub-frames off one shared `TextureSource`.
+- **Touch, all the way down.** `core/input.js` has no keyboard listeners at all: it
+  exposes named actions fed by `setVirtual` / `setStick` / `tap`, which the on-screen
+  controls and the headless test tools both drive. Touch targets are sized from
+  `game.touchUnit` — the number of virtual pixels equal to 44 CSS px on the current
+  device — so they stay thumb-sized whatever the screen.
+- **Pixel buffers, not canvas calls.** Sprites are composed in typed arrays and blitted
+  one `putImageData` per atlas slot. At 48 px tiles the old one-`fillRect`-per-pixel
+  approach would be roughly two million canvas calls at boot.
+- **Effects scale to the device.** `core/quality.js` watches the frame time and steps
+  bloom, depth blur and particle density down a tier when it stays bad, and never
+  oscillates back up on its own. The options tab can pin a tier.
 - **One atlas.** All tiles, characters, ships, props, effects and battlers are painted
   into a single offscreen canvas at boot and sliced into sub-textures, so the whole world
   batches into very few draw calls.
@@ -92,20 +113,20 @@ the pixel art always lands on whole pixels.
 
 ## Controls
 
-| Key | Action |
+| Gesture | Action |
 | --- | --- |
-| **Arrows** / **WASD** | Move, steer the ship, move through menus |
-| **Z** / **Enter** / **Space** | Confirm, talk, examine, advance text (hold in battle to fast-forward) |
-| **X** / **Esc** | Cancel, back out, close a window |
-| **C** / **Tab** | Open the ship's log (crew, gear, items, journal, options, save) |
-| **Q** | Jump straight to the legend journal |
-| **M** | Sea chart overlay (while sailing) |
-| **Shift** (hold) | Run on foot, full sail at sea |
-| **N** | Mute / unmute |
-| **H** / **F1** | Controls and combat help |
-| **Mouse** | Menu entries can also be hovered and clicked |
+| **Touch and drag, left of screen** | Walk, steer the ship. The stick appears wherever your thumb lands |
+| **Push the stick to the rim** | Run on foot, full sail at sea |
+| **◉ button** | Talk, examine, confirm, advance text (hold in battle to fast-forward) |
+| **✕ button** | Cancel, back out, close a window |
+| **Log button** | Crew, gear, items, journal, options, save |
+| **Chart button** | Sea chart — appears only while sailing |
+| **Tap anywhere** | Advance dialogue |
+| **Tap an enemy** | Pick it as your target in battle |
+| **Tap a menu row** | Highlight it; tap again to choose |
+| **Tap a tab** | Switch pages in the ship's log |
 
-In battle, **Left/Right** pick a target, **X** backs out of a submenu.
+In battle you can tap an enemy directly instead of stepping the cursor along the line.
 
 ---
 
@@ -119,9 +140,14 @@ src/main.js                Application init, canvas scaling, ticker, game contex
 
 src/core/
   scene.js                 Scene base class + scene stack with fade transitions
-  input.js                 keyboard state, edge detection, menu auto-repeat
-  font.js                  hand-authored 5x8 bitmap font, word wrap, typewriter text
+  input.js                 named touch actions, edge detection, menu auto-repeat
+  touch.js                 floating analog stick + action buttons, per-scene schemes
+  font.js                  hand-authored 8x14 bitmap font, word wrap, typewriter text
+  paint.js                 colour ramps, seamless noise, the pixel-buffer drawing surface
   art.js                   palette, tile/prop/character/ship/effect art, atlas builder
+  lighting.js              additive light pools over the night darkness
+  particles.js             pooled emitter: embers, spray, dust, sparks
+  quality.js               frame-time driven effect tiers
   battlers.js              enemy + boss silhouettes (22 archetypes, recoloured per region)
   ui.js                    panels, bars, menus, dialogue box, damage popups
   audio.js                 Web Audio chiptune: 7 looping themes + 19 sound effects
@@ -195,7 +221,8 @@ and the Wailing Pass needs four legends and a refit.
 ## Known limitations
 
 - **A static server is required.** ES modules will not load from `file://`.
-- **Desktop keyboard and mouse only.** No touch controls and no gamepad support.
+- **Touch only, landscape only.** There is no keyboard or gamepad support, and portrait
+  shows a rotate prompt rather than a second layout.
 - **Content is a vertical slice.** ~1–2 hours by design: eleven maps, 36 enemies, seven
   legends. Every system is finished, but the world is compact rather than sprawling.
 - **Towns have no interiors.** Shops and inns are run by NPCs at their stalls and doors,
@@ -203,8 +230,13 @@ and the Wailing Pass needs four legends and a refit.
 - **Music is procedural, not composed to picture.** Seven looping themes, no dynamic
   layering, and transitions are hard cuts rather than crossfades.
 - **The party is fixed at three.** There is no bench, no swapping and no fourth slot.
-- **No animation for skills beyond flashes, shakes and popups.** Combat feedback is
-  readable but there are no per-skill effect animations.
+- **No per-skill effect animations.** Combat has impact flashes, shakes, popups and
+  particle bursts, but each skill does not get its own choreography.
+- **Battle enemies are still one frame.** They have a contact shadow, an outline and a
+  rim light, but no idle animation.
+- **Some screens got a mechanical rescale.** The shop, sea chart, ending and game-over
+  screens were scaled to the new stage and verified free of errors, but they have not
+  had the hand-tuning the title, field, battle, log and intro screens received.
 - **Field encounters are step-based**, not visible-on-map monsters, so they cannot be
   avoided except by resolving the region's legend (which does turn them off).
 - **Reputation is shallow.** It shifts shop prices and a few lines; it does not gate
@@ -215,9 +247,12 @@ and the Wailing Pass needs four legends and a refit.
 
 ## Next expansion ideas
 
-1. **Visible field encounters.** Wandering enemy sprites with aggro ranges, so avoidance
+1. **Full-screen bloom.** `core/lighting.js` already gives additive light pools and
+   `core/quality.js` already gates a `bloom` tier; what is missing is the bright-pass
+   and blur composite over the whole frame.
+2. **Visible field encounters.** Wandering enemy sprites with aggro ranges, so avoidance
    becomes a skill; the existing `encounters` tables already describe the roster.
-2. **Town interiors.** The map compiler and warp system already support them — a tavern,
+3. **Town interiors.** The map compiler and warp system already support them — a tavern,
    a chapel and a forge would each be a 20-line ASCII sketch.
 3. **Ship upgrades as systems, not just visuals.** Hull, sail and guns that change sea
    speed, encounter rates and open new lanes; `state.ship.tier` and the three ship

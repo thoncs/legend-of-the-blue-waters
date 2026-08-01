@@ -1,3 +1,6 @@
 node_modules/
 package-lock.json
 tools/shots*/
+node_modules/
+shots/
+tools/shots/

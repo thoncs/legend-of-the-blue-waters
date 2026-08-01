@@ -87,22 +87,22 @@ export class SeaChartScene extends Scene {
 
     this.namePanel = new Panel(10, 16);
     this.namePanel.x = 4;
-    this.namePanel.y = 4;
+    this.namePanel.y = 12;
     this.nameText = new PixelText({ text: '', color: UI.accent });
     this.nameText.x = 10;
-    this.nameText.y = 8;
+    this.nameText.y = 24;
     this.hud.addChild(this.namePanel, this.nameText);
 
-    this.tipPanel = new Panel(width - 8, 16);
+    this.tipPanel = new Panel(width - 24, 48);
     this.tipPanel.x = 4;
-    this.tipPanel.y = height - 20;
+    this.tipPanel.y = height - 60;
     this.tipText = new PixelText({ text: '', color: UI.ink });
     this.tipText.x = 10;
-    this.tipText.y = height - 16;
+    this.tipText.y = height - 48;
     this.hud.addChild(this.tipPanel, this.tipText);
 
     this.legendCount = new PixelText({ text: '', color: UI.dim });
-    this.legendCount.y = 8;
+    this.legendCount.y = 24;
     this.hud.addChild(this.legendCount);
 
     this.chartOverlay = null;
@@ -308,7 +308,7 @@ export class SeaChartScene extends Scene {
   updateTip() {
     const { state } = this.game;
     this.legendCount.text = `legends ${state.resolvedCount}/6`;
-    this.legendCount.x = this.game.width - 6 - this.legendCount.textWidth;
+    this.legendCount.x = this.game.width - 24 - this.legendCount.textWidth;
     // A one-off message (battle aftermath) holds the line for a few seconds.
     if (this.noticeTimer > 0) return;
     const port = this.nearbyPort();
@@ -396,12 +396,12 @@ export class SeaChartScene extends Scene {
 
     const panel = new Panel(width - 12, height - 12, { title: 'THE SUNDER REACH' });
     panel.x = 6;
-    panel.y = 6;
+    panel.y = 18;
     c.addChild(panel);
 
     // Mini map, three pixels per tile.
     const mini = new Graphics();
-    const scale = 3;
+    const scale = 9;
     const mx = 12;
     const my = 22;
     mini.rect(mx - 2, my - 2, this.chart.w * scale + 4, this.chart.h * scale + 4).fill(0x081420);
@@ -461,7 +461,7 @@ export class SeaChartScene extends Scene {
       o.x = listX + 6; o.y = ly;
       c.addChild(o);
       ly += Math.max(10, o.textHeight + 3);
-      if (ly > height - 30) break;
+      if (ly > height - 90) break;
     }
 
     for (const p of this.ports) {
@@ -479,7 +479,7 @@ export class SeaChartScene extends Scene {
 
     const hint = new PixelText({ text: 'M or X to close', color: UI.dim });
     hint.x = 12;
-    hint.y = height - 16;
+    hint.y = height - 48;
     c.addChild(hint);
 
     this.chartOverlay = c;

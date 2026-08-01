@@ -29,42 +29,43 @@ export class ShopScene extends Scene {
     this.addChild(this.head);
 
     this.goldText = new PixelText({ text: '', color: UI.accent });
-    this.goldText.y = 3;
+    this.goldText.y = 9;
     this.addChild(this.goldText);
 
-    this.leftPanel = new Panel(150, height - 34);
-    this.leftPanel.x = 4;
-    this.leftPanel.y = 28;
+    this.leftPanel = new Panel(480, height - 116);
+    this.leftPanel.x = 18;
+    this.leftPanel.y = 84;
     this.addChild(this.leftPanel);
 
-    this.rightPanel = new Panel(width - 162, height - 34);
-    this.rightPanel.x = 158;
-    this.rightPanel.y = 28;
+    this.rightPanel = new Panel(width - 534, height - 116);
+    this.rightPanel.x = 516;
+    this.rightPanel.y = 84;
     this.addChild(this.rightPanel);
 
-    this.detail = new PixelText({ text: '', color: UI.ink, maxWidth: width - 178 });
-    this.detail.x = 165;
-    this.detail.y = 34;
+    this.detail = new PixelText({ text: '', color: UI.ink, maxWidth: width - 576 });
+    this.detail.x = 540;
+    this.detail.y = 102;
     this.addChild(this.detail);
 
-    this.compare = new PixelText({ text: '', color: UI.dim, maxWidth: width - 178 });
-    this.compare.x = 165;
-    this.compare.y = 92;
+    this.compare = new PixelText({ text: '', color: UI.dim, maxWidth: width - 576 });
+    this.compare.x = 540;
+    this.compare.y = 276;
     this.addChild(this.compare);
 
-    this.keeperLine = new PixelText({ text: this.def.greeting, color: UI.dim, maxWidth: width - 178 });
-    this.keeperLine.x = 165;
+    this.keeperLine = new PixelText({ text: this.def.greeting, color: UI.dim, maxWidth: width - 576 });
+    this.keeperLine.x = 540;
     this.keeperLine.y = height - 30;
     this.addChild(this.keeperLine);
 
     this.list = new MenuList({
-      items: [], width: 142, rows: 13, rowHeight: 13,
+      items: [], width: 438, rows: Math.max(3, Math.floor((this.game.height - 200) / this.game.touchUnit)), rowHeight: this.game.touchUnit,
+      touchHeight: this.game.touchUnit,
       onSelect: (item) => this.onSelect(item),
       onCancel: () => this.onCancel(),
       onMove: (item) => this.renderDetail(item),
     });
-    this.list.x = 10;
-    this.list.y = 34;
+    this.list.x = 42;
+    this.list.y = 102;
     this.addChild(this.list);
 
     this.mode = 'root';
@@ -76,7 +77,7 @@ export class ShopScene extends Scene {
   refresh() {
     const { state } = this.game;
     this.goldText.text = `¤ ${state.gold}`;
-    this.goldText.x = this.game.width - 6 - this.goldText.textWidth;
+    this.goldText.x = this.game.width - 24 - this.goldText.textWidth;
     this.list.setItems(this.itemsForMode(), false);
     this.renderDetail(this.list.current);
   }

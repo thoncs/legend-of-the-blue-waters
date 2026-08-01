@@ -10,7 +10,9 @@
     "test": "node tools/balance.mjs",
     "smoke": "node tools/smoke.mjs",
     "sweep": "node tools/scene-sweep.mjs",
-    "loop": "node tools/legend-loop.mjs"
+    "loop": "node tools/legend-loop.mjs",
+    "bootcheck": "node tools/bootcheck.mjs",
+    "mobile": "node tools/mobile-sweep.mjs"
   },
   "devDependencies": {
     "playwright": "^1.49.0"

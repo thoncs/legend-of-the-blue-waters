@@ -22,17 +22,17 @@ export class GameOverScene extends Scene {
     const title = new PixelText({ text: 'THE REACH KEEPS WHAT IT TAKES', color: 0x9a6a6a });
     title.scale.set(2);
     title.x = Math.round((width - measure('THE REACH KEEPS WHAT IT TAKES') * 2) / 2);
-    title.y = 44;
+    title.y = 132;
     this.addChild(title);
 
     const sub = new PixelText({
       text: 'The Salt Wren is found the next week — empty, dry, and pointing the wrong way.',
       color: UI.dim,
-      maxWidth: width - 60,
+      maxWidth: width - 180,
       align: 'center',
     });
-    sub.x = 30;
-    sub.y = 70;
+    sub.x = 90;
+    sub.y = 210;
     this.addChild(sub);
 
     const saves = slotSummaries();
@@ -45,19 +45,19 @@ export class GameOverScene extends Scene {
       .filter(Boolean);
     items.push({ label: 'Return to the title', value: 'title' });
 
-    const panelW = 250;
-    const panelH = items.length * 12 + 16;
+    const panelW = 760;
+    const panelH = items.length * this.game.touchUnit + 48;
     const panel = new Panel(panelW, panelH);
     panel.x = Math.round((width - panelW) / 2);
-    panel.y = 108;
+    panel.y = Math.round(height - panelH - 72);
     this.addChild(panel);
 
     this.menu = new MenuList({
-      items, width: panelW - 14, rows: items.length, rowHeight: 12,
+      items, width: panelW - 42, touchHeight: this.game.touchUnit, rows: items.length, rowHeight: this.game.touchUnit,
       onSelect: (item) => this.choose(item.value),
     });
-    this.menu.x = panel.x + 7;
-    this.menu.y = panel.y + 8;
+    this.menu.x = panel.x + 21;
+    this.menu.y = panel.y + 24;
     this.addChild(this.menu);
 
     audio.stopTheme();

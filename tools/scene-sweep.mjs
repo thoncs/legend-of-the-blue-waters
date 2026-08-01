@@ -11,6 +11,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveExecutable, BASE } from './browser.mjs';
 
+/**
+ * The game is touch-only, so the tools drive it through the same virtual
+ * action hook the on-screen controls use rather than through a keyboard that
+ * no longer exists.
+ */
+async function tap(page, action) {
+  await page.evaluate((a) => window.__lotbw.input.tap(a), action);
+}
+
+
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'shots-sweep');
 mkdirSync(OUT, { recursive: true });
 
@@ -75,12 +85,12 @@ await page.evaluate(async () => {
 });
 await page.waitForTimeout(1200);
 await shot('battle-group');
-await page.keyboard.press('ArrowDown'); await page.waitForTimeout(220);
-await page.keyboard.press('KeyZ'); await page.waitForTimeout(320);
+await tap(page, 'down'); await page.waitForTimeout(220);
+await tap(page, 'confirm'); await page.waitForTimeout(320);
 await shot('battle-skill-list');
-await page.keyboard.press('KeyZ'); await page.waitForTimeout(420);
+await tap(page, 'confirm'); await page.waitForTimeout(420);
 await shot('battle-targeting');
-for (let i = 0; i < 14; i++) { await page.keyboard.press('KeyZ'); await page.waitForTimeout(260); }
+for (let i = 0; i < 14; i++) { await tap(page, 'confirm'); await page.waitForTimeout(260); }
 await shot('battle-midfight');
 
 console.log('windows:');
@@ -98,11 +108,11 @@ await page.evaluate(async () => {
 await page.waitForTimeout(400);
 await shot('menu-crew');
 for (let i = 0; i < 6; i++) {
-  await page.keyboard.press('ArrowRight');
+  await tap(page, 'right');
   await page.waitForTimeout(280);
   await shot(`menu-tab-${i + 1}`);
 }
-await page.keyboard.press('KeyX'); await page.waitForTimeout(300);
+await tap(page, 'cancel'); await page.waitForTimeout(300);
 
 await page.evaluate(async () => {
   const g = window.__lotbw;
@@ -110,13 +120,13 @@ await page.evaluate(async () => {
   await g.scenes.push(ShopScene, { shopId: 'marrowport' });
 });
 await page.waitForTimeout(350);
-await page.keyboard.press('KeyZ'); await page.waitForTimeout(300);
+await tap(page, 'confirm'); await page.waitForTimeout(300);
 await shot('shop-buy');
-await page.keyboard.press('ArrowDown'); await page.waitForTimeout(200);
-await page.keyboard.press('ArrowDown'); await page.waitForTimeout(200);
+await tap(page, 'down'); await page.waitForTimeout(200);
+await tap(page, 'down'); await page.waitForTimeout(200);
 await shot('shop-detail');
-await page.keyboard.press('KeyX'); await page.waitForTimeout(200);
-await page.keyboard.press('KeyX'); await page.waitForTimeout(300);
+await tap(page, 'cancel'); await page.waitForTimeout(200);
+await tap(page, 'cancel'); await page.waitForTimeout(300);
 
 console.log('sea:');
 await page.evaluate(async () => {
@@ -126,9 +136,9 @@ await page.evaluate(async () => {
 });
 await page.waitForTimeout(500);
 await shot('sea');
-await page.keyboard.press('KeyM'); await page.waitForTimeout(400);
+await tap(page, 'chart'); await page.waitForTimeout(400);
 await shot('sea-chart');
-await page.keyboard.press('KeyM'); await page.waitForTimeout(200);
+await tap(page, 'chart'); await page.waitForTimeout(200);
 
 console.log('ending + gameover:');
 await page.evaluate(async () => {
@@ -143,7 +153,7 @@ await page.evaluate(async () => {
 });
 await page.waitForTimeout(700);
 await shot('ending');
-for (let i = 0; i < 9; i++) { await page.keyboard.press('KeyZ'); await page.waitForTimeout(220); }
+for (let i = 0; i < 9; i++) { await tap(page, 'confirm'); await page.waitForTimeout(220); }
 await shot('ending-menu');
 
 await page.evaluate(async () => {
