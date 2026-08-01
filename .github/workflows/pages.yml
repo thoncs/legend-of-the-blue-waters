@@ -1,0 +1,74 @@
+name: Deploy to GitHub Pages
+
+# The game is a static site with no build step, so publishing is just a matter
+# of staging the three directories the browser actually needs. The logic suite
+# runs first and gates the deploy.
+
+on:
+  push:
+    # Today's default branch, plus `main` so a future rename keeps working.
+    branches:
+      - claude/pirate-jrpg-pixijs-rsqgwg
+      - main
+  # Lets you publish any branch by hand from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue them instead of cancelling, so a push that
+# lands mid-deploy still ends up published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Logic and battle balance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No `npm ci` on purpose: tools/balance.mjs imports nothing outside
+      # src/, so the suite needs no dependencies and cannot be broken by a
+      # registry hiccup. The browser-driven tools do need Playwright, but they
+      # are not the gate — this one verifies the quest chain, equipment rules,
+      # save round-trips, data integrity, and auto-plays 20 battles per
+      # encounter to check the win rates have not drifted.
+      - name: Run the headless suite
+        run: node tools/balance.mjs
+
+  deploy:
+    name: Publish
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r src vendor _site/
+          # Pages would otherwise run the artifact through Jekyll, which skips
+          # underscore-prefixed paths and buys us nothing here.
+          touch _site/.nojekyll
+          echo "Publishing:" && find _site -type f | wc -l && du -sh _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -26,8 +26,11 @@ npm start
 Then open <http://localhost:8080/>. Click once or press a key to let the browser start audio.
 
 There is nothing to install and nothing to build. PixiJS is vendored at
-`vendor/pixi.min.mjs` (the official `pixi.js@8.19.0` ESM browser bundle, MIT licensed) and
-mapped through an import map in `index.html`, so the game also runs fully offline.
+`vendor/pixi.min.js` (the official `pixi.js@8.19.0` ESM browser bundle, MIT licensed) and
+mapped through an import map in `index.html`, so the game also runs fully offline. The
+bundle keeps a `.js` extension rather than `.mjs` purely so it serves correctly from
+static hosts that do not map `.mjs` to a JavaScript MIME type; the import map names the
+specifier, so the extension carries no meaning here.
 
 ### Optional dev tools
 
@@ -138,7 +141,7 @@ In battle you can tap an enemy directly instead of stepping the cursor along the
 
 ```
 index.html                 entry point, import map, boot screen
-vendor/pixi.min.mjs        vendored PixiJS 8.19.0 (MIT)
+vendor/pixi.min.js         vendored PixiJS 8.19.0 (MIT)
 
 src/main.js                Application init, canvas scaling, ticker, game context
 
@@ -287,4 +290,4 @@ cultures, spirits and folklore here are fiction written for this game rather tha
 depiction of any real tradition.
 
 PixiJS is © the PixiJS contributors, MIT licensed, and vendored unmodified at
-`vendor/pixi.min.mjs`.
+`vendor/pixi.min.js`.
