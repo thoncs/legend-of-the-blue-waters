@@ -13,13 +13,14 @@ import { buildSeaChart, TILE_DEFS, SEA_CHART } from '../data/maps.js';
 import { LEGENDS, LEGEND_STATE } from '../data/legends.js';
 import { portsFor } from '../systems/worldstate.js';
 import { objectiveText, rumorLegend, activateLegend, advanceStage } from '../systems/quests.js';
+import { TILE } from '../core/art.js';
 
-const TILE = 16;
 const SAIL_MS = 118;
 const FULL_SAIL_MS = 74;
 
 export class SeaChartScene extends Scene {
   onEnter(params = {}) {
+    this.controlScheme = 'sea';
     const { width, height, art, state } = this.game;
     this.chart = buildSeaChart();
     this.params = params;
@@ -514,7 +515,7 @@ export class SeaChartScene extends Scene {
       this.noticeTimer -= dtMS;
       if (this.noticeTimer <= 0) this.updateTip();
     }
-    const frame = Math.floor(this.t / 360) % 3;
+    const frame = Math.floor(this.t / 300) % 6;
     if (frame !== this.animFrame) {
       this.animFrame = frame;
       const { art } = this.game;

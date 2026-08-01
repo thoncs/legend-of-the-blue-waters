@@ -1,7 +1,7 @@
 /**
  * The world: eleven hand-authored tile maps plus the open sea chart.
  *
- * Maps are written as ASCII sketches — one character per 16px tile — which
+ * Maps are written as ASCII sketches — one character per 48px tile — which
  * keeps them readable and editable in place. `TILE_DEFS` maps each character
  * to a generated texture and its collision. Digits inside a sketch are
  * *marks*: named anchor tiles that warps, NPCs and objects refer to by name
@@ -33,10 +33,10 @@ export const TILE_DEFS = {
   d: { tex: 'sandWet' },
 
   // --- water (never walkable) ---
-  '~': { anim: ['water0', 'water1', 'water2'], solid: true },
-  W: { anim: ['deep0', 'deep1', 'deep2'], solid: true },
-  _: { anim: ['shallow0', 'shallow1', 'shallow2'], solid: true },
-  n: { anim: ['moonsea0', 'moonsea1', 'moonsea2'], solid: true },
+  '~': { anim: ['water0', 'water1', 'water2', 'water3', 'water4', 'water5'], solid: true },
+  W: { anim: ['deep0', 'deep1', 'deep2', 'deep3', 'deep4', 'deep5'], solid: true },
+  _: { anim: ['shallow0', 'shallow1', 'shallow2', 'shallow3', 'shallow4', 'shallow5'], solid: true },
+  n: { anim: ['moonsea0', 'moonsea1', 'moonsea2', 'moonsea3', 'moonsea4', 'moonsea5'], solid: true },
   o: { tex: 'reefWater', solid: true },
   w: { tex: 'swampWater', solid: true },
   X: { tex: 'stormSea', solid: true },

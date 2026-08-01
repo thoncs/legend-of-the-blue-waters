@@ -48,6 +48,7 @@ function shortName(full) {
 
 export class BattleScene extends Scene {
   onEnter(params = {}) {
+    this.controlScheme = 'battle';
     const { width, height, state } = this.game;
     this.params = params;
     this.battle = new Battle(state, {

@@ -14,6 +14,7 @@ import { saveGame } from '../core/save.js';
 
 export class EndingScene extends Scene {
   onEnter() {
+    this.controlScheme = 'tap';
     const { width, height, art, state } = this.game;
 
     const sky = new Graphics();
@@ -206,7 +207,7 @@ export class EndingScene extends Scene {
     this.t += dtMS;
     this.prompt.update(dtMS);
 
-    const frame = Math.floor(this.t / 380) % 3;
+    const frame = Math.floor(this.t / 320) % 4;
     if (frame !== this._wf) {
       this._wf = frame;
       const tex = this.game.art.tex(`tile:water${frame}`);

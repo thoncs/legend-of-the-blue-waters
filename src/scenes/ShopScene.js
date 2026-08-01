@@ -14,6 +14,7 @@ import { priceMultiplier } from '../systems/worldstate.js';
 
 export class ShopScene extends Scene {
   onEnter(params) {
+    this.controlScheme = 'menu';
     this.overlay = true;
     const { width, height, state } = this.game;
     this.shopId = params.shopId;

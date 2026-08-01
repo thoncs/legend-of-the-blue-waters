@@ -40,6 +40,7 @@ const PAGES = [
 
 export class IntroScene extends Scene {
   onEnter() {
+    this.controlScheme = 'tap';
     const { width, height, art } = this.game;
 
     const sky = new Graphics();
@@ -184,7 +185,7 @@ export class IntroScene extends Scene {
     this.t += dtMS;
     this.prompt.update(dtMS);
 
-    const frame = Math.floor(this.t / 340) % 3;
+    const frame = Math.floor(this.t / 300) % 4;
     if (frame !== this._wf) {
       this._wf = frame;
       const tex = this.game.art.tex(`tile:moonsea${frame}`);

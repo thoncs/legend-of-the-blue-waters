@@ -18,6 +18,7 @@ const TABS = ['Crew', 'Gear', 'Items', 'Journal', 'Options', 'Save', 'Help'];
 
 export class MenuScene extends Scene {
   onEnter(params = {}) {
+    this.controlScheme = 'menu';
     this.overlay = true;
     const { width, height } = this.game;
 

@@ -12,6 +12,7 @@ import { rng } from '../core/rng.js';
 
 export class TitleScene extends Scene {
   onEnter() {
+    this.controlScheme = 'menu';
     const { width, height, art } = this.game;
 
     this.sky = new Graphics();
@@ -288,7 +289,7 @@ export class TitleScene extends Scene {
     this.hint.update(dtMS);
 
     // Water animation.
-    const frame = Math.floor(this.t / 340) % 3;
+    const frame = Math.floor(this.t / 300) % 4;
     if (frame !== this.waterFrame) {
       this.waterFrame = frame;
       const tex = this.game.art.tex(`tile:moonsea${frame}`);

@@ -11,6 +11,7 @@ import { slotSummaries, loadGame, formatPlayTime } from '../core/save.js';
 
 export class GameOverScene extends Scene {
   onEnter() {
+    this.controlScheme = 'menu';
     const { width, height } = this.game;
 
     const bg = new Graphics();

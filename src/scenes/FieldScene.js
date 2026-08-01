@@ -21,8 +21,8 @@ import {
   ambientTint, encountersEnabled, gateBlocked, musicFor, nightGate,
 } from '../systems/worldstate.js';
 import { saveGame } from '../core/save.js';
+import { TILE, ACTOR_FRAMES } from '../core/art.js';
 
-const TILE = 16;
 const STEP_MS = 148;
 const RUN_MS = 92;
 
@@ -62,6 +62,7 @@ const OBJECT_FLAVOR = {
 
 export class FieldScene extends Scene {
   onEnter(params = {}) {
+    this.controlScheme = 'field';
     const { state, art, width, height } = this.game;
     this.params = params;
     this.mapId = params.mapId ?? state.position.map;
@@ -998,12 +999,24 @@ export class FieldScene extends Scene {
 
   /* ---------------------------- dialogue --------------------------- */
 
+  /**
+   * The on-screen controls follow the field's state: a conversation turns the
+   * whole screen into "tap to advance", a choice hands over to its menu, and
+   * otherwise the stick and buttons are back.
+   */
+  syncScheme() {
+    if (this.choiceUI) this.setControlScheme('menu');
+    else if (this.talking) this.setControlScheme('tap');
+    else this.setControlScheme('field');
+  }
+
   say(lines, speaker = '', done = null) {
     const normalized = lines.filter(Boolean).map((l) => (typeof l === 'string' ? { speaker, text: l } : l));
     this.queue.push(...normalized);
     this.onDialogueDone = done;
     this.talking = true;
     this.dialogueBox.visible = true;
+    this.syncScheme();
     this.nextLine();
   }
 
@@ -1012,6 +1025,7 @@ export class FieldScene extends Scene {
     if (!next) {
       this.talking = false;
       this.dialogueBox.visible = false;
+      this.syncScheme();
       const cb = this.onDialogueDone;
       this.onDialogueDone = null;
       if (cb) cb();
@@ -1054,6 +1068,7 @@ export class FieldScene extends Scene {
 
     this.choiceUI = { root: c, menu };
     this.addChild(c);
+    this.syncScheme();
   }
 
   closeOverlay() {
@@ -1061,6 +1076,7 @@ export class FieldScene extends Scene {
     this.removeChild(this.choiceUI.root);
     this.choiceUI.root.destroy({ children: true });
     this.choiceUI = null;
+    this.syncScheme();
   }
 
   async openShop(shopId) {
@@ -1128,7 +1144,7 @@ export class FieldScene extends Scene {
   update(dtMS) {
     this.t += dtMS;
 
-    const frame = Math.floor(this.t / 360) % 3;
+    const frame = Math.floor(this.t / 300) % 6;
     if (frame !== this.animFrame) { this.animFrame = frame; this.updateAnimTiles(); }
 
     this.updateWeather(dtMS);
@@ -1191,7 +1207,7 @@ export class FieldScene extends Scene {
     const p = this.player;
     if (moving) {
       p.animT += dtMS;
-      if (p.animT > 130) { p.animT = 0; p.frame = p.frame === 1 ? 2 : 1; }
+      if (p.animT > 120) { p.animT = 0; p.frame = (p.frame + 1) % ACTOR_FRAMES; }
     } else {
       p.frame = 0;
     }
@@ -1233,7 +1249,7 @@ export class FieldScene extends Scene {
         n.sprite.x = Math.round(x);
         n.sprite.y = Math.round(y);
         n.animT += dtMS;
-        if (n.animT > 150) { n.animT = 0; n.frame = n.frame === 1 ? 2 : 1; }
+        if (n.animT > 140) { n.animT = 0; n.frame = (n.frame + 1) % ACTOR_FRAMES; }
         n.sprite.texture = this.game.art.actor(n.def.style, n.dir, n.frame);
       } else {
         n.sprite.texture = this.game.art.actor(n.def.style, n.dir, 0);
